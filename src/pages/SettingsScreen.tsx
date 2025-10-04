@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Clock, DollarSign, Plus, Edit, Trash2, Table, Package, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Clock, DollarSign, Table, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { usePosStore } from '@/hooks/usePosStore';
-import { Product } from '@/types/pos';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsScreen() {
@@ -21,10 +19,6 @@ export default function SettingsScreen() {
     setHalfHourRate, 
     saveSettings,
     tables,
-    products,
-    createProduct,
-    updateProduct,
-    deleteProduct,
     setTableCount
   } = usePosStore();
   
@@ -34,14 +28,6 @@ export default function SettingsScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // Product management states
-  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState({
-    name: '',
-    price: 0,
-    category: 'drink' as 'drink' | 'food'
-  });
 
   useEffect(() => {
     setLocalHourlyRate(hourlyRate);
@@ -94,75 +80,6 @@ export default function SettingsScreen() {
 
   const hasChanges = localHourlyRate !== hourlyRate || localHalfHourRate !== halfHourRate || localTableCount !== tables.length;
 
-  // Product management functions
-  const handleProductSubmit = async () => {
-    try {
-      if (editingProduct) {
-        await updateProduct(editingProduct.id, productForm);
-        toast({
-          title: "Product Updated Successfully!",
-          description: `${productForm.name} has been updated.`,
-          duration: 3000,
-        });
-      } else {
-        await createProduct(productForm);
-        toast({
-          title: "Product Added Successfully!",
-          description: `${productForm.name} has been added to your menu.`,
-          duration: 3000,
-        });
-      }
-      setIsProductDialogOpen(false);
-      setEditingProduct(null);
-      setProductForm({ name: '', price: 0, category: 'drink' });
-    } catch (error) {
-      console.error('Failed to save product:', error);
-      toast({
-        title: "Failed to Save Product",
-        description: "There was an error saving the product. Please try again.",
-        variant: "destructive",
-        duration: 4000,
-      });
-    }
-  };
-
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setProductForm({
-      name: product.name,
-      price: Number(product.price),
-      category: product.category
-    });
-    setIsProductDialogOpen(true);
-  };
-
-  const handleDeleteProduct = async (productId: number) => {
-    const product = products.find(p => p.id === productId);
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        await deleteProduct(productId);
-        toast({
-          title: "Product Deleted Successfully!",
-          description: `${product?.name || 'Product'} has been removed from your menu.`,
-          duration: 3000,
-        });
-      } catch (error) {
-        console.error('Failed to delete product:', error);
-        toast({
-          title: "Failed to Delete Product",
-          description: "There was an error deleting the product. Please try again.",
-          variant: "destructive",
-          duration: 4000,
-        });
-      }
-    }
-  };
-
-  const openNewProductDialog = () => {
-    setEditingProduct(null);
-    setProductForm({ name: '', price: 0, category: 'drink' });
-    setIsProductDialogOpen(true);
-  };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#E8E0D2' }}>
@@ -350,167 +267,27 @@ export default function SettingsScreen() {
             </CardContent>
           </Card>
 
-          {/* Products Management */}
+          {/* Inventory Management Note */}
           <Card className="shadow-sm" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-            <CardHeader style={{ backgroundColor: '#2C313A' }}>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-white font-semibold flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Products & Drinks Management
-                </CardTitle>
-                <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      onClick={openNewProductDialog}
-                      className="text-white"
-                      style={{ backgroundColor: '#404750' }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Product
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-                    <DialogHeader>
-                      <DialogTitle style={{ color: '#2C313A' }}>
-                        {editingProduct ? 'Edit Product' : 'Add New Product'}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="productName" style={{ color: '#2C313A' }}>Product Name</Label>
-                        <Input
-                          id="productName"
-                          value={productForm.name}
-                          onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                          placeholder="Enter product name"
-                          style={{ backgroundColor: 'white' }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="productPrice" style={{ color: '#2C313A' }}>Price (₱)</Label>
-                        <Input
-                          id="productPrice"
-                          type="number"
-                          value={productForm.price}
-                          onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          style={{ backgroundColor: 'white' }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="productCategory" style={{ color: '#2C313A' }}>Category</Label>
-                        <Select
-                          value={productForm.category}
-                          onValueChange={(value: 'drink' | 'food') => setProductForm({ ...productForm, category: value })}
-                        >
-                          <SelectTrigger style={{ backgroundColor: 'white' }}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="drink">Drink</SelectItem>
-                            <SelectItem value="food">Food</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex gap-2 pt-4">
-                        <Button
-                          onClick={handleProductSubmit}
-                          className="flex-1 text-white"
-                          style={{ backgroundColor: '#404750' }}
-                        >
-                          {editingProduct ? 'Update' : 'Add'} Product
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsProductDialogOpen(false)}
-                          className="flex-1"
-                          style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
             <CardContent className="p-6">
-              <div className="space-y-4">
-                {/* Drinks */}
-                <div>
-                  <h4 className="font-semibold mb-3" style={{ color: '#2C313A' }}>🥤 Drinks</h4>
-                  <div className="space-y-2">
-                    {products.filter(p => p.category === 'drink').map(product => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-3 rounded-lg border"
-                        style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}
-                      >
-                        <div>
-                          <div className="font-medium" style={{ color: '#2C313A' }}>{product.name}</div>
-                          <div className="text-sm" style={{ color: '#404750' }}>₱{Number(product.price).toFixed(2)}</div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditProduct(product)}
-                            style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              <div className="text-center">
+                <div className="mb-4">
+                  <Package className="h-12 w-12 mx-auto mb-3" style={{ color: '#404750' }} />
+                  <h3 className="text-lg font-semibold mb-2" style={{ color: '#2C313A' }}>
+                    Product & Inventory Management
+                  </h3>
+                  <p className="text-sm" style={{ color: '#404750' }}>
+                    Manage your products, track inventory, and monitor stock levels in the dedicated Inventory page.
+                  </p>
                 </div>
-
-                {/* Food */}
-                <div>
-                  <h4 className="font-semibold mb-3" style={{ color: '#2C313A' }}>🍕 Food</h4>
-                  <div className="space-y-2">
-                    {products.filter(p => p.category === 'food').map(product => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-3 rounded-lg border"
-                        style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}
-                      >
-                        <div>
-                          <div className="font-medium" style={{ color: '#2C313A' }}>{product.name}</div>
-                          <div className="text-sm" style={{ color: '#404750' }}>₱{Number(product.price).toFixed(2)}</div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditProduct(product)}
-                            style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <Button
+                  onClick={() => navigate('/inventory')}
+                  className="text-white"
+                  style={{ backgroundColor: '#404750' }}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Go to Inventory
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -533,10 +310,6 @@ export default function SettingsScreen() {
                 <div className="flex justify-between">
                   <span style={{ color: '#404750' }}>Current 30 Min Rate:</span>
                   <span className="font-medium" style={{ color: '#2C313A' }}>₱{halfHourRate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span style={{ color: '#404750' }}>Total Products:</span>
-                  <span className="font-medium" style={{ color: '#2C313A' }}>{products.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span style={{ color: '#404750' }}>Settings Status:</span>

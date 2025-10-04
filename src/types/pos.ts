@@ -14,7 +14,23 @@ export interface Product {
   id: number;
   name: string;
   price: number | string; // Can be number or string from database
-  category: 'drink' | 'food';
+  cost: number | string; // Purchase or base cost
+  quantity: number; // Current stock count
+  category: 'drink' | 'food' | 'accessory' | 'other';
+  created_at?: string;
+}
+
+export interface Inventory {
+  id: number;
+  product_id: number;
+  product_name: string;
+  price: number | string;
+  cost: number | string;
+  quantity: number;
+  category: string;
+  change_type: 'add' | 'update' | 'sale' | 'adjustment';
+  change_quantity: number;
+  created_at: string;
 }
 
 export interface OrderItem {

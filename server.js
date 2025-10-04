@@ -11,6 +11,7 @@ import transactionRoutes from './routes/transactions.js';
 import reportRoutes from './routes/reports.js';
 import settingsRoutes from './routes/settings.js';
 import sessionRoutes from './routes/sessions.js';
+import inventoryRoutes from './routes/inventory.js';
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // Socket.io for real-time updates
 io.on('connection', (socket) => {

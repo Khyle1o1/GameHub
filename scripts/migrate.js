@@ -36,7 +36,9 @@ const createTables = async () => {
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         price DECIMAL(10,2) NOT NULL,
-        category VARCHAR(20) NOT NULL CHECK (category IN ('drink', 'food')),
+        cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        category VARCHAR(20) NOT NULL CHECK (category IN ('drink', 'food', 'accessory', 'other')),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -97,6 +99,22 @@ const createTables = async () => {
       )
     `);
 
+    // Create inventory table (for tracking inventory changes)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS inventory (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id),
+        product_name VARCHAR(100) NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        cost DECIMAL(10,2) NOT NULL,
+        quantity INTEGER NOT NULL,
+        category VARCHAR(20) NOT NULL,
+        change_type VARCHAR(20) NOT NULL CHECK (change_type IN ('add', 'update', 'sale', 'adjustment')),
+        change_quantity INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create settings table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -134,22 +152,22 @@ const insertDefaultData = async () => {
     const productsResult = await pool.query('SELECT COUNT(*) FROM products');
     if (parseInt(productsResult.rows[0].count) === 0) {
       const defaultProducts = [
-        { name: 'Coca Cola', price: 2.50, category: 'drink' },
-        { name: 'Pepsi', price: 2.50, category: 'drink' },
-        { name: 'Sprite', price: 2.50, category: 'drink' },
-        { name: 'Beer', price: 4.00, category: 'drink' },
-        { name: 'Water', price: 1.50, category: 'drink' },
-        { name: 'Chips', price: 3.00, category: 'food' },
-        { name: 'Noodles', price: 5.00, category: 'food' },
-        { name: 'Sandwich', price: 6.00, category: 'food' },
-        { name: 'Pizza Slice', price: 4.50, category: 'food' },
-        { name: 'Hot Dog', price: 3.50, category: 'food' }
+        { name: 'Coca Cola', price: 2.50, cost: 1.50, quantity: 50, category: 'drink' },
+        { name: 'Pepsi', price: 2.50, cost: 1.50, quantity: 50, category: 'drink' },
+        { name: 'Sprite', price: 2.50, cost: 1.50, quantity: 50, category: 'drink' },
+        { name: 'Beer', price: 4.00, cost: 2.50, quantity: 30, category: 'drink' },
+        { name: 'Water', price: 1.50, cost: 0.75, quantity: 100, category: 'drink' },
+        { name: 'Chips', price: 3.00, cost: 1.80, quantity: 40, category: 'food' },
+        { name: 'Noodles', price: 5.00, cost: 2.50, quantity: 25, category: 'food' },
+        { name: 'Sandwich', price: 6.00, cost: 3.00, quantity: 20, category: 'food' },
+        { name: 'Pizza Slice', price: 4.50, cost: 2.25, quantity: 30, category: 'food' },
+        { name: 'Hot Dog', price: 3.50, cost: 1.75, quantity: 35, category: 'food' }
       ];
 
       for (const product of defaultProducts) {
         await pool.query(
-          'INSERT INTO products (name, price, category) VALUES ($1, $2, $3)',
-          [product.name, product.price, product.category]
+          'INSERT INTO products (name, price, cost, quantity, category) VALUES ($1, $2, $3, $4, $5)',
+          [product.name, product.price, product.cost, product.quantity, product.category]
         );
       }
       console.log('✅ Default products inserted');

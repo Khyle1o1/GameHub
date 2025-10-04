@@ -7,6 +7,7 @@ import PosScreen from "./pages/PosScreen";
 import DisplayScreen from "./pages/DisplayScreen";
 import ReportsScreen from "./pages/ReportsScreen";
 import SettingsScreen from "./pages/SettingsScreen";
+import InventoryScreen from "./pages/InventoryScreen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/display" element={<DisplayScreen />} />
           <Route path="/reports" element={<ReportsScreen />} />
           <Route path="/settings" element={<SettingsScreen />} />
+          <Route path="/inventory" element={<InventoryScreen />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

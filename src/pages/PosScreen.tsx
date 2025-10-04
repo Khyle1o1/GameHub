@@ -1,4 +1,4 @@
-import { Monitor, Loader2, BarChart3, Settings, Clock } from 'lucide-react';
+import { Monitor, Loader2, BarChart3, Settings, Clock, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TableCard } from '@/components/TableCard';
 import { ProductList } from '@/components/ProductList';
@@ -85,6 +85,19 @@ export default function PosScreen() {
               </div>
               
               <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/inventory')}
+                  style={{ 
+                    borderColor: '#9B9182', 
+                    color: '#E8E0D2',
+                    backgroundColor: 'transparent'
+                  }}
+                  className="hover:bg-opacity-10 hover:bg-white"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Inventory
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => navigate('/settings')}

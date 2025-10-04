@@ -73,16 +73,16 @@ const loadProducts = () => {
   }
   // Default products
   return [
-    { id: 1, name: 'Coca Cola', price: 25, category: 'drink' as const },
-    { id: 2, name: 'Pepsi', price: 25, category: 'drink' as const },
-    { id: 3, name: 'Sprite', price: 25, category: 'drink' as const },
-    { id: 4, name: 'Beer', price: 40, category: 'drink' as const },
-    { id: 5, name: 'Water', price: 15, category: 'drink' as const },
-    { id: 6, name: 'Chips', price: 30, category: 'food' as const },
-    { id: 7, name: 'Noodles', price: 50, category: 'food' as const },
-    { id: 8, name: 'Sandwich', price: 60, category: 'food' as const },
-    { id: 9, name: 'Pizza Slice', price: 45, category: 'food' as const },
-    { id: 10, name: 'Hot Dog', price: 35, category: 'food' as const }
+    { id: 1, name: 'Coca Cola', price: 25, cost: 15, quantity: 50, category: 'drink' as const },
+    { id: 2, name: 'Pepsi', price: 25, cost: 15, quantity: 50, category: 'drink' as const },
+    { id: 3, name: 'Sprite', price: 25, cost: 15, quantity: 50, category: 'drink' as const },
+    { id: 4, name: 'Beer', price: 40, cost: 25, quantity: 30, category: 'drink' as const },
+    { id: 5, name: 'Water', price: 15, cost: 7.5, quantity: 100, category: 'drink' as const },
+    { id: 6, name: 'Chips', price: 30, cost: 18, quantity: 40, category: 'food' as const },
+    { id: 7, name: 'Noodles', price: 50, cost: 25, quantity: 25, category: 'food' as const },
+    { id: 8, name: 'Sandwich', price: 60, cost: 30, quantity: 20, category: 'food' as const },
+    { id: 9, name: 'Pizza Slice', price: 45, cost: 22.5, quantity: 30, category: 'food' as const },
+    { id: 10, name: 'Hot Dog', price: 35, cost: 17.5, quantity: 35, category: 'food' as const }
   ];
 };
 

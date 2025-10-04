@@ -62,14 +62,14 @@ class ApiClient {
     return this.request<any[]>(`/products/category/${category}`);
   }
 
-  async createProduct(product: { name: string; price: number; category: string }) {
+  async createProduct(product: { name: string; price: number; cost: number; quantity: number; category: string }) {
     return this.request<any>('/products', {
       method: 'POST',
       body: JSON.stringify(product),
     });
   }
 
-  async updateProduct(id: number, product: { name: string; price: number; category: string }) {
+  async updateProduct(id: number, product: { name: string; price: number; cost: number; quantity: number; category: string }) {
     return this.request<any>(`/products/${id}`, {
       method: 'PUT',
       body: JSON.stringify(product),
@@ -204,6 +204,26 @@ class ApiClient {
 
   async getSessionsByTable(tableId: number) {
     return this.request<any[]>(`/sessions/table/${tableId}`);
+  }
+
+  // Inventory API
+  async getInventory() {
+    return this.request<any[]>('/inventory');
+  }
+
+  async getInventoryByProduct(productId: number) {
+    return this.request<any[]>(`/inventory/product/${productId}`);
+  }
+
+  async getInventorySummary() {
+    return this.request<any[]>('/inventory/summary');
+  }
+
+  async adjustInventory(productId: number, quantity: number, changeType: string = 'adjustment') {
+    return this.request<any>(`/inventory/adjust/${productId}`, {
+      method: 'POST',
+      body: JSON.stringify({ quantity, changeType }),
+    });
   }
 }
 
