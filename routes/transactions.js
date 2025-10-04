@@ -5,7 +5,7 @@ const router = express.Router();
 
 // Create transaction (checkout)
 router.post('/', async (req, res) => {
-  const { tableId, timeCost, productCost, totalAmount } = req.body;
+  const { tableId, timeCost, productCost, totalAmount, paymentMethod = 'cash', referenceNumber } = req.body;
 
   try {
     // Start transaction
@@ -15,29 +15,22 @@ router.post('/', async (req, res) => {
       await client.query('BEGIN');
 
       // Create transaction record
-      const transactionResult = await client.query(
-        'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost) VALUES ($1, $2, $3, $4) RETURNING *',
-        [tableId, totalAmount, timeCost, productCost]
-      );
-
-      // Get the most recent session ID for this table (if exists)
-      const sessionResult = await client.query(
-        'SELECT id FROM sessions WHERE table_id = $1 ORDER BY id DESC LIMIT 1',
-        [tableId]
-      );
-      
-      const sessionId = sessionResult.rows[0]?.id;
-
-      // Try to link transaction to session if exists (column may not exist in older databases)
-      if (sessionId) {
-        try {
-          await client.query(
-            'UPDATE transactions SET session_id = $1 WHERE id = $2',
-            [sessionId, transactionResult.rows[0].id]
+      let transactionResult;
+      try {
+        // Try to insert with payment method and reference number
+        transactionResult = await client.query(
+          'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost, payment_method, reference_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+          [tableId, totalAmount, timeCost, productCost, paymentMethod, referenceNumber || null]
+        );
+      } catch (err) {
+        // If payment_method column doesn't exist, insert without it
+        if (err.code === '42703') {
+          transactionResult = await client.query(
+            'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost) VALUES ($1, $2, $3, $4) RETURNING *',
+            [tableId, totalAmount, timeCost, productCost]
           );
-        } catch (err) {
-          // Column doesn't exist yet, skip this step
-          console.log('Note: transactions.session_id column not found, skipping link');
+        } else {
+          throw err;
         }
       }
 

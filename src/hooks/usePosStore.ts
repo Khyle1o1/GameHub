@@ -284,7 +284,7 @@ export const usePosStore = create<PosStore>((set, get) => {
     }
   },
 
-  checkoutTable: async (tableId) => {
+  checkoutTable: async (tableId, paymentMethod = 'cash', referenceNumber) => {
     try {
       set({ isLoading: true, error: null });
       const { timeCost, productCost, total } = get().calculateTableTotal(tableId);
@@ -294,13 +294,17 @@ export const usePosStore = create<PosStore>((set, get) => {
         timeCost,
         productCost,
         totalAmount: total,
+        paymentMethod,
+        referenceNumber
       });
       
-      // Refresh tables after checkout
+      // Clear selected table and refresh all tables after checkout
+      set({ selectedTableId: null });
       await get().fetchTables();
       set({ isLoading: false });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to checkout table', isLoading: false });
+      throw error; // Re-throw to handle in component
     }
   },
 
@@ -320,6 +324,11 @@ export const usePosStore = create<PosStore>((set, get) => {
     const table = tables.find(table => table.id === tableId);
     
     if (!table) return { timeCost: 0, productCost: 0, total: 0 };
+
+    // If table is available (no active or stopped session), return 0
+    if (table.status === 'available' && !table.isActive && !table.startTime) {
+      return { timeCost: 0, productCost: 0, total: 0 };
+    }
 
     // Calculate time cost
     let timeCost = 0;

@@ -156,40 +156,42 @@ export function OrderSummary({ table }: OrderSummaryProps) {
           )}
         </div>
 
-        {/* Total & Checkout */}
-        <div className="space-y-4 pt-4" style={{ borderTop: '1px solid #9B9182' }}>
-          <div className="space-y-3 p-4 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-            {(table.isActive || table.status === 'stopped') && (
-              <div className="flex justify-between text-sm">
-                <span style={{ color: '#404750' }}>Time Fee</span>
-                <span className="font-semibold" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>
+        {/* Total & Checkout - Only show if table has active session or orders */}
+        {((table.isActive || table.status === 'stopped') || (table.orders && table.orders.length > 0)) && (
+          <div className="space-y-4 pt-4" style={{ borderTop: '1px solid #9B9182' }}>
+            <div className="space-y-3 p-4 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+              {(table.isActive || table.status === 'stopped') && (
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: '#404750' }}>Time Fee</span>
+                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>
+                </div>
+              )}
+              {table.orders && table.orders.length > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: '#404750' }}>Orders Total</span>
+                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{productCost.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold pt-2" style={{ borderTop: '1px solid #9B9182' }}>
+                <span style={{ color: '#2C313A' }}>Grand Total</span>
+                <span style={{ color: '#2C313A' }}>₱{total.toFixed(2)}</span>
               </div>
-            )}
-            {table.orders && table.orders.length > 0 && (
-              <div className="flex justify-between text-sm">
-                <span style={{ color: '#404750' }}>Orders Total</span>
-                <span className="font-semibold" style={{ color: '#2C313A' }}>₱{productCost.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-bold pt-2" style={{ borderTop: '1px solid #9B9182' }}>
-              <span style={{ color: '#2C313A' }}>Grand Total</span>
-              <span style={{ color: '#2C313A' }}>₱{total.toFixed(2)}</span>
             </div>
+            <Button
+              className="w-full text-white font-semibold py-3"
+              size="lg"
+              onClick={() => setIsPaymentModalOpen(true)}
+              disabled={total === 0}
+              style={{ 
+                backgroundColor: total === 0 ? '#9B9182' : '#404750',
+                color: '#E8E0D2'
+              }}
+            >
+              <Receipt className="h-5 w-5 mr-2" />
+              Checkout
+            </Button>
           </div>
-          <Button
-            className="w-full text-white font-semibold py-3"
-            size="lg"
-            onClick={() => setIsPaymentModalOpen(true)}
-            disabled={total === 0}
-            style={{ 
-              backgroundColor: total === 0 ? '#9B9182' : '#404750',
-              color: '#E8E0D2'
-            }}
-          >
-            <Receipt className="h-5 w-5 mr-2" />
-            Checkout
-          </Button>
-        </div>
+        )}
       </CardContent>
       
       {/* Payment Modal */}

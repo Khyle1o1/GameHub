@@ -125,6 +125,8 @@ class ApiClient {
     timeCost: number;
     productCost: number;
     totalAmount: number;
+    paymentMethod?: string;
+    referenceNumber?: string;
   }) {
     return this.request<any>('/transactions', {
       method: 'POST',
