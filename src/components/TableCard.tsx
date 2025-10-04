@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Clock, Play, Square, RotateCcw } from 'lucide-react';
+import { Clock, Play, Square, RotateCcw, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table } from '@/types/pos';
 import { usePosStore } from '@/hooks/usePosStore';
+import { DurationSelector } from '@/components/DurationSelector';
+import { TimeExtensionModal } from '@/components/TimeExtensionModal';
 
 interface TableCardProps {
   table: Table;
 }
 
 export function TableCard({ table }: TableCardProps) {
-  const { selectedTableId, startTableSession, stopTableSession, resetTable, setSelectedTable, calculateTableTotal, calculateOpenTimeCost } = usePosStore();
+  const { selectedTableId, startTableSession, stopTableSession, resetTable, setSelectedTable, calculateTableTotal, calculateOpenTimeCost, addTimeExtension } = usePosStore();
   const [elapsedTime, setElapsedTime] = useState(0);
   const [pricingBreakdown, setPricingBreakdown] = useState('');
+  const [isDurationSelectorOpen, setIsDurationSelectorOpen] = useState(false);
+  const [isTimeExtensionOpen, setIsTimeExtensionOpen] = useState(false);
 
   useEffect(() => {
     if (!table.startTime) {
@@ -61,11 +65,20 @@ export function TableCard({ table }: TableCardProps) {
         if (table.mode === 'hour' && elapsed >= 3600) {
           stopTableSession(table.id);
         }
+
+        // Auto-stop when countdown reaches 0
+        if (table.mode === 'countdown' && table.countdownDuration) {
+          const totalExtensions = (table.timeExtensions || []).reduce((sum, ext) => sum + ext.addedDuration, 0);
+          const totalDuration = table.countdownDuration + totalExtensions;
+          if (elapsed >= totalDuration) {
+            stopTableSession(table.id);
+          }
+        }
       }, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [table.isActive, table.startTime, table.endTime, table.mode, table.id, stopTableSession, calculateOpenTimeCost]);
+  }, [table.isActive, table.startTime, table.endTime, table.mode, table.id, table.countdownDuration, table.timeExtensions, stopTableSession, calculateOpenTimeCost]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -74,9 +87,38 @@ export function TableCard({ table }: TableCardProps) {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const getRemainingTime = () => {
+    if (table.mode === 'countdown' && table.countdownDuration) {
+      const totalExtensions = (table.timeExtensions || []).reduce((sum, ext) => sum + ext.addedDuration, 0);
+      const totalDuration = table.countdownDuration + totalExtensions;
+      const remaining = Math.max(0, totalDuration - elapsedTime);
+      return remaining;
+    }
+    return elapsedTime;
+  };
+
+  const getDisplayTime = () => {
+    if (table.mode === 'countdown') {
+      return getRemainingTime();
+    }
+    return elapsedTime;
+  };
+
   const getStatusColor = () => {
     if (table.isActive) {
+      if (table.mode === 'countdown') {
+        const remaining = getRemainingTime();
+        if (remaining <= 300) { // 5 minutes or less
+          return '#DC2626'; // Red for urgent
+        } else if (remaining <= 900) { // 15 minutes or less
+          return '#F59E0B'; // Orange for warning
+        }
+        return '#059669'; // Green for good
+      }
       return table.mode === 'hour' ? '#9B9182' : '#414A52';
+    }
+    if (table.status === 'needs_checkout') {
+      return '#DC2626'; // Red for needs checkout
     }
     return '#2C3035';
   };
@@ -85,7 +127,19 @@ export function TableCard({ table }: TableCardProps) {
     if (table.status === 'stopped') {
       return 'Stopped';
     }
+    if (table.status === 'needs_checkout') {
+      return 'Time\'s Up';
+    }
     if (table.isActive) {
+      if (table.mode === 'countdown') {
+        const remaining = getRemainingTime();
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        if (hours > 0) {
+          return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+      }
       return table.mode === 'hour' ? '1 Hour' : 'Open Time';
     }
     return 'Available';
@@ -132,7 +186,7 @@ export function TableCard({ table }: TableCardProps) {
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" style={{ color: '#404750' }} />
               <span className="font-mono text-xl font-bold" style={{ color: '#2C313A' }}>
-                {formatTime(elapsedTime)}
+                {formatTime(getDisplayTime())}
               </span>
             </div>
             
@@ -162,8 +216,8 @@ export function TableCard({ table }: TableCardProps) {
           </div>
         )}
 
-        <div className="flex gap-2">
-          {!table.isActive && table.status !== 'stopped' ? (
+        <div className="flex gap-1 flex-wrap">
+          {!table.isActive && table.status !== 'stopped' && table.status !== 'needs_checkout' ? (
             <>
               <Button
                 size="sm"
@@ -171,7 +225,7 @@ export function TableCard({ table }: TableCardProps) {
                   e.stopPropagation();
                   startTableSession(table.id, 'open');
                 }}
-                className="flex-1 text-white"
+                className="flex-1 min-w-0 text-white"
                 style={{ backgroundColor: '#404750' }}
               >
                 <Play className="h-4 w-4 mr-1" />
@@ -182,9 +236,9 @@ export function TableCard({ table }: TableCardProps) {
                 variant="outline"
                 onClick={(e) => {
                   e.stopPropagation();
-                  startTableSession(table.id, 'hour');
+                  setIsDurationSelectorOpen(true);
                 }}
-                className="flex-1"
+                className="flex-1 min-w-0"
                 style={{ 
                   borderColor: '#9B9182', 
                   color: '#2C313A',
@@ -192,10 +246,10 @@ export function TableCard({ table }: TableCardProps) {
                 }}
               >
                 <Play className="h-4 w-4 mr-1" />
-                1 Hour
+                Timer
               </Button>
             </>
-          ) : table.status === 'stopped' ? (
+          ) : table.status === 'stopped' || table.status === 'needs_checkout' ? (
             <>
               <Button
                 size="sm"
@@ -204,7 +258,7 @@ export function TableCard({ table }: TableCardProps) {
                   e.stopPropagation();
                   resetTable(table.id);
                 }}
-                className="flex-1"
+                className="w-full"
                 style={{ 
                   borderColor: '#9B9182', 
                   color: '#2C313A',
@@ -217,6 +271,20 @@ export function TableCard({ table }: TableCardProps) {
             </>
           ) : (
             <>
+              {table.mode === 'countdown' && (
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsTimeExtensionOpen(true);
+                  }}
+                  className="flex-1 min-w-0 text-white"
+                  style={{ backgroundColor: '#059669' }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="destructive"
@@ -224,7 +292,7 @@ export function TableCard({ table }: TableCardProps) {
                   e.stopPropagation();
                   stopTableSession(table.id);
                 }}
-                className="flex-1 text-white"
+                className="flex-1 min-w-0 text-white"
                 style={{ backgroundColor: '#2C313A' }}
               >
                 <Square className="h-4 w-4 mr-1" />
@@ -237,7 +305,7 @@ export function TableCard({ table }: TableCardProps) {
                   e.stopPropagation();
                   resetTable(table.id);
                 }}
-                className="flex-1"
+                className="flex-1 min-w-0"
                 style={{ 
                   borderColor: '#9B9182', 
                   color: '#2C313A',
@@ -257,6 +325,27 @@ export function TableCard({ table }: TableCardProps) {
           </div>
         )}
       </CardContent>
+
+      {/* Duration Selector Modal */}
+      <DurationSelector
+        isOpen={isDurationSelectorOpen}
+        onClose={() => setIsDurationSelectorOpen(false)}
+        onStart={(duration) => {
+          startTableSession(table.id, 'countdown', duration);
+        }}
+        title="Start Countdown Timer"
+        buttonText="Start Timer"
+      />
+
+      {/* Time Extension Modal */}
+      <TimeExtensionModal
+        isOpen={isTimeExtensionOpen}
+        onClose={() => setIsTimeExtensionOpen(false)}
+        onAddTime={(duration) => {
+          addTimeExtension(table.id, duration);
+        }}
+        currentTimeRemaining={getRemainingTime()}
+      />
     </Card>
   );
 }

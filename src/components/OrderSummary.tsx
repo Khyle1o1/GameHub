@@ -44,7 +44,7 @@ export function OrderSummary({ table }: OrderSummaryProps) {
       <CardContent className="flex-1 flex flex-col p-4">
         <div className="flex-1 space-y-4">
           {/* Time Fee */}
-          {(table.isActive || table.status === 'stopped') && (
+          {(table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') && (
             <div className="p-4 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
               <div className="font-semibold mb-3 flex items-center gap-2" style={{ color: '#2C313A' }}>
                 <span className="text-lg">⏱️</span>
@@ -53,10 +53,28 @@ export function OrderSummary({ table }: OrderSummaryProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span style={{ color: '#404750' }}>
-                    {table.mode === 'open' ? 'Open Time Rate' : 'Hourly Rate'}: ₱{hourlyRate}/hr
+                    {table.mode === 'open' ? 'Open Time Rate' : 
+                     table.mode === 'countdown' ? 'Countdown Timer' : 'Hourly Rate'}: ₱{hourlyRate}/hr
                   </span>
                   <span className="font-semibold" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>
                 </div>
+                
+                {/* Countdown Mode Details */}
+                {table.mode === 'countdown' && (
+                  <div className="space-y-2">
+                    <div className="text-xs p-2 rounded" style={{ backgroundColor: '#9B9182', color: '#E8E0D2' }}>
+                      <div className="font-medium mb-1">Countdown Details:</div>
+                      <div>Initial Duration: {Math.floor((table.countdownDuration || 0) / 60)} minutes</div>
+                      {table.timeExtensions && table.timeExtensions.length > 0 && (
+                        <div>
+                          Extensions: {table.timeExtensions.length} × {table.timeExtensions.map(ext => Math.floor(ext.addedDuration / 60)).join(', ')} min
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Open Time Breakdown */}
                 {table.mode === 'open' && table.startTime && (
                   <div className="text-xs p-2 rounded" style={{ backgroundColor: '#9B9182', color: '#E8E0D2' }}>
                     <span className="font-medium">Breakdown:</span> {(() => {
@@ -157,10 +175,10 @@ export function OrderSummary({ table }: OrderSummaryProps) {
         </div>
 
         {/* Total & Checkout - Only show if table has active session or orders */}
-        {((table.isActive || table.status === 'stopped') || (table.orders && table.orders.length > 0)) && (
+        {((table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') || (table.orders && table.orders.length > 0)) && (
           <div className="space-y-4 pt-4" style={{ borderTop: '1px solid #9B9182' }}>
             <div className="space-y-3 p-4 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-              {(table.isActive || table.status === 'stopped') && (
+              {(table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') && (
                 <div className="flex justify-between text-sm">
                   <span style={{ color: '#404750' }}>Time Fee</span>
                   <span className="font-semibold" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>

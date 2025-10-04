@@ -34,10 +34,10 @@ class ApiClient {
     });
   }
 
-  async startTableSession(tableId: number, mode: 'open' | 'hour') {
+  async startTableSession(tableId: number, mode: 'open' | 'hour' | 'countdown', duration?: number) {
     return this.request<any>(`/tables/${tableId}/start`, {
       method: 'POST',
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify({ mode, duration }),
     });
   }
 
@@ -50,6 +50,13 @@ class ApiClient {
   async resetTable(tableId: number) {
     return this.request<any>(`/tables/${tableId}/reset`, {
       method: 'POST',
+    });
+  }
+
+  async addTimeExtension(tableId: number, duration: number) {
+    return this.request<any>(`/tables/${tableId}/extend`, {
+      method: 'POST',
+      body: JSON.stringify({ duration }),
     });
   }
 

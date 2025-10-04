@@ -23,9 +23,10 @@ interface PosStore extends PosState {
   updateOrderQuantity: (orderId: number, quantity: number) => Promise<void>;
   removeOrderItem: (orderId: number) => Promise<void>;
   clearTableOrders: (tableId: number) => Promise<void>;
-  startTableSession: (tableId: number, mode: 'open' | 'hour') => Promise<void>;
+  startTableSession: (tableId: number, mode: 'open' | 'hour' | 'countdown', duration?: number) => Promise<void>;
   stopTableSession: (tableId: number) => Promise<void>;
   resetTable: (tableId: number) => Promise<void>;
+  addTimeExtension: (tableId: number, duration: number) => Promise<void>;
   checkoutTable: (tableId: number, paymentMethod?: 'cash' | 'gcash', referenceNumber?: string) => Promise<void>;
   saveSettings: (settings: { hourlyRate: number; halfHourRate: number; tableCount?: number }) => Promise<void>;
   
@@ -245,10 +246,10 @@ export const usePosStore = create<PosStore>((set, get) => {
     }
   },
 
-  startTableSession: async (tableId, mode) => {
+  startTableSession: async (tableId, mode, duration) => {
     try {
       set({ isLoading: true, error: null });
-      await apiClient.startTableSession(tableId, mode);
+      await apiClient.startTableSession(tableId, mode, duration);
       
       // Refresh tables to get updated session info
       await get().fetchTables();
@@ -281,6 +282,19 @@ export const usePosStore = create<PosStore>((set, get) => {
       set({ isLoading: false });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to reset table', isLoading: false });
+    }
+  },
+
+  addTimeExtension: async (tableId, duration) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.addTimeExtension(tableId, duration);
+      
+      // Refresh tables to get updated session info
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to add time extension', isLoading: false });
     }
   },
 
@@ -341,6 +355,14 @@ export const usePosStore = create<PosStore>((set, get) => {
         // Use new Open Time pricing logic
         const { totalCost } = get().calculateOpenTimeCost(elapsedSeconds);
         timeCost = totalCost;
+      } else if (table.mode === 'countdown') {
+        // Calculate countdown pricing based on initial duration + extensions
+        const initialDuration = table.countdownDuration || 0;
+        const extensions = table.timeExtensions || [];
+        const totalDuration = initialDuration + extensions.reduce((sum, ext) => sum + ext.addedDuration, 0);
+        
+        // Calculate cost based on total duration
+        timeCost = get().calculateCountdownCost(totalDuration);
       } else {
         // Use old hourly rate for hour mode
         const elapsedMinutes = Math.ceil(elapsedSeconds / 60);
@@ -423,6 +445,36 @@ export const usePosStore = create<PosStore>((set, get) => {
       totalCost: Math.round(totalCost * 100) / 100, // Round to 2 decimal places
       breakdown
     };
+  },
+
+  calculateCountdownCost: (totalDurationSeconds) => {
+    const { hourlyRate, halfHourRate } = get();
+    const totalMinutes = Math.floor(totalDurationSeconds / 60);
+    
+    // Countdown pricing logic:
+    // 30 mins: ₱100
+    // 1 hour: ₱150
+    // 1.5 hours: ₱250
+    // 2 hours: ₱300
+    // 2.5 hours: ₱400
+    // 3 hours: ₱450
+    // etc.
+    
+    let totalCost = 0;
+    
+    if (totalMinutes <= 30) {
+      totalCost = halfHourRate; // ₱100
+    } else if (totalMinutes <= 60) {
+      totalCost = hourlyRate; // ₱150
+    } else {
+      // Beyond 1 hour: ₱150 + (additional time * ₱100 per 30 mins)
+      totalCost = hourlyRate;
+      const additionalMinutes = totalMinutes - 60;
+      const additional30MinBlocks = Math.ceil(additionalMinutes / 30);
+      totalCost += additional30MinBlocks * halfHourRate; // ₱100 per 30-min block
+    }
+    
+    return Math.round(totalCost * 100) / 100; // Round to 2 decimal places
   },
 
   saveSettings: async (settings) => {

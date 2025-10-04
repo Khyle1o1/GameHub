@@ -12,9 +12,21 @@ router.get('/', async (req, res) => {
         s.start_time,
         s.end_time,
         s.mode,
+        s.countdown_duration,
         s.id as session_id,
         EXTRACT(EPOCH FROM s.start_time) * 1000 as start_time_ms,
-        EXTRACT(EPOCH FROM s.end_time) * 1000 as end_time_ms
+        EXTRACT(EPOCH FROM s.end_time) * 1000 as end_time_ms,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', te.id,
+              'addedDuration', te.added_duration,
+              'addedAt', EXTRACT(EPOCH FROM te.added_at) * 1000,
+              'cost', te.cost
+            )
+          ) FILTER (WHERE te.id IS NOT NULL),
+          '[]'::json
+        ) as time_extensions
       FROM tables t
       LEFT JOIN LATERAL (
         SELECT * FROM sessions 
@@ -22,7 +34,10 @@ router.get('/', async (req, res) => {
         ORDER BY id DESC 
         LIMIT 1
       ) s ON true
+      LEFT JOIN time_extensions te ON te.session_id = s.id
       WHERE t.status != 'inactive'
+      GROUP BY t.id, t.name, t.status, t.is_active, t.start_time, t.mode, t.created_at,
+               s.start_time, s.end_time, s.mode, s.countdown_duration, s.id
       ORDER BY t.id
     `);
     
@@ -34,7 +49,9 @@ router.get('/', async (req, res) => {
       startTime: row.start_time_ms ? Math.floor(row.start_time_ms) : null,
       endTime: row.end_time_ms ? Math.floor(row.end_time_ms) : null,
       mode: row.mode,
-      sessionId: row.session_id
+      sessionId: row.session_id,
+      countdownDuration: row.countdown_duration,
+      timeExtensions: row.time_extensions || []
     }));
 
     res.json(tables);
@@ -138,7 +155,7 @@ router.post('/count', async (req, res) => {
 // Start table session
 router.post('/:id/start', async (req, res) => {
   const { id } = req.params;
-  const { mode } = req.body; // 'open' or 'hour'
+  const { mode, duration } = req.body; // 'open', 'hour', or 'countdown' with optional duration
 
   try {
     // Check if table is already active
@@ -153,8 +170,8 @@ router.post('/:id/start', async (req, res) => {
 
     // Start new session
     const result = await pool.query(
-      'INSERT INTO sessions (table_id, start_time, mode) VALUES ($1, NOW(), $2) RETURNING *',
-      [id, mode]
+      'INSERT INTO sessions (table_id, start_time, mode, countdown_duration) VALUES ($1, NOW(), $2, $3) RETURNING *',
+      [id, mode, mode === 'countdown' ? duration : null]
     );
 
     // Update table status
@@ -164,7 +181,7 @@ router.post('/:id/start', async (req, res) => {
     );
 
     const io = req.app.get('io');
-    io.emit('tableUpdated', { tableId: id, action: 'started', mode });
+    io.emit('tableUpdated', { tableId: id, action: 'started', mode, duration });
 
     res.json({
       success: true,
@@ -205,10 +222,25 @@ router.post('/:id/stop', async (req, res) => {
       [totalMinutes, session.id]
     );
 
-    // Update table status to stopped (not available yet - waiting for checkout)
+    // Update table status based on mode
+    let newStatus = 'stopped';
+    if (session.mode === 'countdown') {
+      // Check if countdown time has expired
+      const totalExtensions = await pool.query(
+        'SELECT COALESCE(SUM(added_duration), 0) as total_extensions FROM time_extensions WHERE session_id = $1',
+        [session.id]
+      );
+      const totalDuration = (session.countdown_duration || 0) + (totalExtensions.rows[0].total_extensions || 0);
+      const elapsedSeconds = Math.floor((endTime - startTime) / 1000);
+      
+      if (elapsedSeconds >= totalDuration) {
+        newStatus = 'needs_checkout'; // Time's up
+      }
+    }
+    
     await pool.query(
       'UPDATE tables SET status = $1 WHERE id = $2',
-      ['stopped', id]
+      [newStatus, id]
     );
 
     const io = req.app.get('io');
@@ -223,6 +255,49 @@ router.post('/:id/stop', async (req, res) => {
   } catch (error) {
     console.error('Error stopping table session:', error);
     res.status(500).json({ error: 'Failed to stop table session' });
+  }
+});
+
+// Add time extension to active session
+router.post('/:id/extend', async (req, res) => {
+  const { id } = req.params;
+  const { duration } = req.body;
+
+  try {
+    // Get active session
+    const sessionResult = await pool.query(
+      'SELECT * FROM sessions WHERE table_id = $1 AND end_time IS NULL',
+      [id]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(400).json({ error: 'No active session found' });
+    }
+
+    const session = sessionResult.rows[0];
+
+    // Only allow extensions for countdown mode
+    if (session.mode !== 'countdown') {
+      return res.status(400).json({ error: 'Time extensions only allowed for countdown mode' });
+    }
+
+    // Create time extension record
+    const extensionResult = await pool.query(
+      'INSERT INTO time_extensions (session_id, added_duration, added_at, cost) VALUES ($1, $2, NOW(), $3) RETURNING *',
+      [session.id, duration, 0] // Cost will be calculated at checkout
+    );
+
+    const io = req.app.get('io');
+    io.emit('tableUpdated', { tableId: id, action: 'extended', duration });
+
+    res.json({
+      success: true,
+      extension: extensionResult.rows[0],
+      message: `Added ${duration} seconds to table ${id}`
+    });
+  } catch (error) {
+    console.error('Error adding time extension:', error);
+    res.status(500).json({ error: 'Failed to add time extension' });
   }
 });
 

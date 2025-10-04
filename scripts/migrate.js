@@ -52,7 +52,20 @@ const createTables = async () => {
         end_time TIMESTAMP,
         duration_minutes INTEGER,
         total_cost DECIMAL(10,2),
-        mode VARCHAR(10) NOT NULL CHECK (mode IN ('open', 'hour')),
+        mode VARCHAR(10) NOT NULL CHECK (mode IN ('open', 'hour', 'countdown')),
+        countdown_duration INTEGER, -- Duration in seconds for countdown mode
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create time_extensions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS time_extensions (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES sessions(id),
+        added_duration INTEGER NOT NULL, -- Duration added in seconds
+        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        cost DECIMAL(10,2) DEFAULT 0, -- Cost of this extension
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);

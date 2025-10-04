@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table } from '@/types/pos';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface PaymentModalProps {
 }
 
 export function PaymentModal({ isOpen, onClose, table, totalAmount, onConfirmPayment }: PaymentModalProps) {
+  const { toast } = useToast();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash'>('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -27,11 +29,25 @@ export function PaymentModal({ isOpen, onClose, table, totalAmount, onConfirmPay
         paymentMethod, 
         paymentMethod === 'gcash' ? referenceNumber : undefined
       );
+      
+      // Show success toast
+      toast({
+        title: "Payment Successful! 🎉",
+        description: `₱${totalAmount.toFixed(2)} payment completed for ${table?.name} via ${paymentMethod.toUpperCase()}`,
+        duration: 4000,
+      });
+      
       onClose();
       setReferenceNumber('');
       setPaymentMethod('cash');
     } catch (error) {
       console.error('Payment failed:', error);
+      toast({
+        title: "Payment Failed",
+        description: "There was an error processing your payment. Please try again.",
+        variant: "destructive",
+        duration: 4000,
+      });
     } finally {
       setIsProcessing(false);
     }

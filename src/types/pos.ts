@@ -1,13 +1,24 @@
 export interface Table {
   id: number;
   name: string;
-  status: 'available' | 'occupied' | 'stopped';
+  status: 'available' | 'occupied' | 'stopped' | 'needs_checkout';
   isActive: boolean;
   startTime: number | null;
   endTime: number | null;
-  mode: 'open' | 'hour' | null;
+  mode: 'open' | 'hour' | 'countdown' | null;
   sessionId?: number;
   orders?: OrderItem[];
+  // New countdown fields
+  countdownDuration?: number; // Duration in seconds
+  timeExtensions?: TimeExtension[]; // Array of time extensions
+}
+
+export interface TimeExtension {
+  id: number;
+  sessionId: number;
+  addedDuration: number; // Duration added in seconds
+  addedAt: number; // Timestamp when extension was added
+  cost: number; // Cost of this extension
 }
 
 export interface Product {
@@ -50,7 +61,9 @@ export interface TimeSession {
   endTime?: string;
   totalMinutes?: number;
   cost?: number;
-  mode: 'open' | 'hour';
+  mode: 'open' | 'hour' | 'countdown';
+  countdownDuration?: number; // Duration in seconds for countdown mode
+  timeExtensions?: TimeExtension[];
 }
 
 export interface Transaction {

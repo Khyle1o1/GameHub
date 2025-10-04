@@ -15,24 +15,10 @@ router.post('/', async (req, res) => {
       await client.query('BEGIN');
 
       // Create transaction record
-      let transactionResult;
-      try {
-        // Try to insert with payment method and reference number
-        transactionResult = await client.query(
-          'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost, payment_method, reference_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-          [tableId, totalAmount, timeCost, productCost, paymentMethod, referenceNumber || null]
-        );
-      } catch (err) {
-        // If payment_method column doesn't exist, insert without it
-        if (err.code === '42703') {
-          transactionResult = await client.query(
-            'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost) VALUES ($1, $2, $3, $4) RETURNING *',
-            [tableId, totalAmount, timeCost, productCost]
-          );
-        } else {
-          throw err;
-        }
-      }
+      const transactionResult = await client.query(
+        'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost, payment_method, reference_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [tableId, totalAmount, timeCost, productCost, paymentMethod, referenceNumber || null]
+      );
 
       // End any active or stopped session
       await client.query(
