@@ -24,10 +24,27 @@ router.post('/', async (req, res) => {
   const { tableId, productId, productName, price, quantity } = req.body;
 
   try {
-    const result = await pool.query(
-      'INSERT INTO orders (table_id, product_id, product_name, price, quantity) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [tableId, productId, productName, price, quantity]
+    // Check if the same product already exists for this table
+    const existingOrder = await pool.query(
+      'SELECT * FROM orders WHERE table_id = $1 AND product_id = $2',
+      [tableId, productId]
     );
+
+    let result;
+    if (existingOrder.rows.length > 0) {
+      // Update existing order quantity
+      const newQuantity = existingOrder.rows[0].quantity + quantity;
+      result = await pool.query(
+        'UPDATE orders SET quantity = $1 WHERE id = $2 RETURNING *',
+        [newQuantity, existingOrder.rows[0].id]
+      );
+    } else {
+      // Create new order
+      result = await pool.query(
+        'INSERT INTO orders (table_id, product_id, product_name, price, quantity) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [tableId, productId, productName, price, quantity]
+      );
+    }
 
     const io = req.app.get('io');
     io.emit('orderAdded', { tableId, order: result.rows[0] });

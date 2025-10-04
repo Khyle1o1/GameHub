@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { usePosStore } from '@/hooks/usePosStore';
+import { ApiClient } from '@/lib/api';
 
 export default function ReportsScreen() {
   const navigate = useNavigate();
@@ -32,48 +33,40 @@ export default function ReportsScreen() {
     return () => clearInterval(timeInterval);
   }, []);
 
-  // Mock data generation for demonstration
+  // Load real report data
   useEffect(() => {
-    const generateMockData = () => {
-      const today = new Date();
-      const isToday = selectedPeriod === 'today';
-      
-      // Generate mock revenue data
-      const baseRevenue = isToday ? 2500 : selectedPeriod === 'week' ? 17500 : 70000;
-      const timeRevenue = baseRevenue * 0.7;
-      const productRevenue = baseRevenue * 0.3;
-      
-      // Generate mock payment data
-      const cashPayments = baseRevenue * 0.6;
-      const gcashPayments = baseRevenue * 0.4;
-      
-      // Generate mock top products
-      const topProducts = products.slice(0, 5).map((product, index) => ({
-        name: product.name,
-        quantity: Math.floor(Math.random() * 20) + 5,
-        revenue: Math.floor(Math.random() * 500) + 100
-      }));
-      
-      // Generate hourly data for today
-      const hourlyData = isToday ? Array.from({ length: 12 }, (_, i) => ({
-        hour: `${i + 8}:00`,
-        revenue: Math.floor(Math.random() * 300) + 50
-      })) : [];
-      
-      setReportData({
-        totalRevenue: baseRevenue,
-        timeRevenue,
-        productRevenue,
-        totalTransactions: Math.floor(baseRevenue / 150) + Math.floor(Math.random() * 10),
-        cashPayments,
-        gcashPayments,
-        topProducts,
-        hourlyData
-      });
+    const loadReportData = async () => {
+      try {
+        // For now, set empty data since we don't have real report endpoints yet
+        // This will be replaced with actual API calls when report endpoints are implemented
+        setReportData({
+          totalRevenue: 0,
+          timeRevenue: 0,
+          productRevenue: 0,
+          totalTransactions: 0,
+          cashPayments: 0,
+          gcashPayments: 0,
+          topProducts: [],
+          hourlyData: []
+        });
+      } catch (error) {
+        console.error('Error loading report data:', error);
+        // Set empty data on error
+        setReportData({
+          totalRevenue: 0,
+          timeRevenue: 0,
+          productRevenue: 0,
+          totalTransactions: 0,
+          cashPayments: 0,
+          gcashPayments: 0,
+          topProducts: [],
+          hourlyData: []
+        });
+      }
     };
     
-    generateMockData();
-  }, [selectedPeriod, products]);
+    loadReportData();
+  }, [selectedPeriod]);
 
   const formatCurrency = (amount: number) => `₱${amount.toLocaleString()}`;
   const formatDate = (date: Date) => date.toLocaleDateString('en-PH');

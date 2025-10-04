@@ -26,7 +26,20 @@ router.get('/', async (req, res) => {
             )
           ) FILTER (WHERE te.id IS NOT NULL),
           '[]'::json
-        ) as time_extensions
+        ) as time_extensions,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', o.id,
+              'productId', o.product_id,
+              'productName', o.product_name,
+              'price', o.price,
+              'quantity', o.quantity,
+              'createdAt', o.created_at
+            )
+          ) FILTER (WHERE o.id IS NOT NULL),
+          '[]'::json
+        ) as orders
       FROM tables t
       LEFT JOIN LATERAL (
         SELECT * FROM sessions 
@@ -35,6 +48,7 @@ router.get('/', async (req, res) => {
         LIMIT 1
       ) s ON true
       LEFT JOIN time_extensions te ON te.session_id = s.id
+      LEFT JOIN orders o ON o.table_id = t.id
       WHERE t.status != 'inactive'
       GROUP BY t.id, t.name, t.status, t.is_active, t.start_time, t.mode, t.created_at,
                s.start_time, s.end_time, s.mode, s.countdown_duration, s.id
@@ -51,7 +65,8 @@ router.get('/', async (req, res) => {
       mode: row.mode,
       sessionId: row.session_id,
       countdownDuration: row.countdown_duration,
-      timeExtensions: row.time_extensions || []
+      timeExtensions: row.time_extensions || [],
+      orders: row.orders || []
     }));
 
     res.json(tables);

@@ -139,72 +139,11 @@ const createTables = async () => {
     `);
 
     console.log('✅ Enhanced database tables created successfully');
-
-    // Insert default data
-    await insertDefaultData();
     
   } catch (error) {
     console.error('❌ Error creating tables:', error);
   } finally {
     await pool.end();
-  }
-};
-
-const insertDefaultData = async () => {
-  try {
-    // Insert default tables
-    const tablesResult = await pool.query('SELECT COUNT(*) FROM tables');
-    if (parseInt(tablesResult.rows[0].count) === 0) {
-      for (let i = 1; i <= 8; i++) {
-        await pool.query('INSERT INTO tables (name) VALUES ($1)', [`Table ${i}`]);
-      }
-      console.log('✅ Default tables inserted');
-    }
-
-    // Insert default products
-    const productsResult = await pool.query('SELECT COUNT(*) FROM products');
-    if (parseInt(productsResult.rows[0].count) === 0) {
-      const defaultProducts = [
-        { name: 'Coca Cola', price: 2.50, cost: 1.50, quantity: 50, category: 'drink' },
-        { name: 'Pepsi', price: 2.50, cost: 1.50, quantity: 50, category: 'drink' },
-        { name: 'Sprite', price: 2.50, cost: 1.50, quantity: 50, category: 'drink' },
-        { name: 'Beer', price: 4.00, cost: 2.50, quantity: 30, category: 'drink' },
-        { name: 'Water', price: 1.50, cost: 0.75, quantity: 100, category: 'drink' },
-        { name: 'Chips', price: 3.00, cost: 1.80, quantity: 40, category: 'food' },
-        { name: 'Noodles', price: 5.00, cost: 2.50, quantity: 25, category: 'food' },
-        { name: 'Sandwich', price: 6.00, cost: 3.00, quantity: 20, category: 'food' },
-        { name: 'Pizza Slice', price: 4.50, cost: 2.25, quantity: 30, category: 'food' },
-        { name: 'Hot Dog', price: 3.50, cost: 1.75, quantity: 35, category: 'food' }
-      ];
-
-      for (const product of defaultProducts) {
-        await pool.query(
-          'INSERT INTO products (name, price, cost, quantity, category) VALUES ($1, $2, $3, $4, $5)',
-          [product.name, product.price, product.cost, product.quantity, product.category]
-        );
-      }
-      console.log('✅ Default products inserted');
-    }
-
-    // Insert default settings
-    const settingsResult = await pool.query('SELECT COUNT(*) FROM settings');
-    if (parseInt(settingsResult.rows[0].count) === 0) {
-      const defaultSettings = [
-        { key: 'hourly_rate', value: '150' },
-        { key: 'half_hour_rate', value: '100' },
-        { key: 'table_count', value: '8' }
-      ];
-
-      for (const setting of defaultSettings) {
-        await pool.query(
-          'INSERT INTO settings (key, value) VALUES ($1, $2)',
-          [setting.key, setting.value]
-        );
-      }
-      console.log('✅ Default settings inserted');
-    }
-  } catch (error) {
-    console.error('❌ Error inserting default data:', error);
   }
 };
 

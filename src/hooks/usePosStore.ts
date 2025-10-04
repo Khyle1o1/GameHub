@@ -72,19 +72,8 @@ const loadProducts = () => {
   } catch (error) {
     console.error('Failed to load products from localStorage:', error);
   }
-  // Default products
-  return [
-    { id: 1, name: 'Coca Cola', price: 25, cost: 15, quantity: 50, category: 'drink' as const },
-    { id: 2, name: 'Pepsi', price: 25, cost: 15, quantity: 50, category: 'drink' as const },
-    { id: 3, name: 'Sprite', price: 25, cost: 15, quantity: 50, category: 'drink' as const },
-    { id: 4, name: 'Beer', price: 40, cost: 25, quantity: 30, category: 'drink' as const },
-    { id: 5, name: 'Water', price: 15, cost: 7.5, quantity: 100, category: 'drink' as const },
-    { id: 6, name: 'Chips', price: 30, cost: 18, quantity: 40, category: 'food' as const },
-    { id: 7, name: 'Noodles', price: 50, cost: 25, quantity: 25, category: 'food' as const },
-    { id: 8, name: 'Sandwich', price: 60, cost: 30, quantity: 20, category: 'food' as const },
-    { id: 9, name: 'Pizza Slice', price: 45, cost: 22.5, quantity: 30, category: 'food' as const },
-    { id: 10, name: 'Hot Dog', price: 35, cost: 17.5, quantity: 35, category: 'food' as const }
-  ];
+  // Return empty array - no default products
+  return [];
 };
 
 const initialSettings = loadSettings();
@@ -191,6 +180,7 @@ export const usePosStore = create<PosStore>((set, get) => {
   addOrderItem: async (tableId, item) => {
     try {
       set({ isLoading: true, error: null });
+      
       await apiClient.addOrderItem({
         tableId,
         productId: item.productId,
@@ -339,14 +329,9 @@ export const usePosStore = create<PosStore>((set, get) => {
     
     if (!table) return { timeCost: 0, productCost: 0, total: 0 };
 
-    // If table is available (no active or stopped session), return 0
-    if (table.status === 'available' && !table.isActive && !table.startTime) {
-      return { timeCost: 0, productCost: 0, total: 0 };
-    }
-
-    // Calculate time cost
+    // Calculate time cost (only if there's an active session)
     let timeCost = 0;
-    if (table.startTime) {
+    if (table.startTime && table.isActive) {
       // Use endTime if session is stopped, otherwise use current time
       const endTime = table.endTime || Date.now();
       const elapsedSeconds = Math.floor((endTime - table.startTime) / 1000);
@@ -370,7 +355,7 @@ export const usePosStore = create<PosStore>((set, get) => {
       }
     }
 
-    // Calculate product cost
+    // Calculate product cost (always calculate, regardless of session status)
     const productCost = (table.orders || []).reduce((sum, order) => {
       return sum + (Number(order.price) * order.quantity);
     }, 0);

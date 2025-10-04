@@ -20,12 +20,16 @@ export function ProductList({ products, disabled }: ProductListProps) {
   const handleAddProduct = async (product: Product) => {
     if (!selectedTableId) return;
     
-    await addOrderItem(selectedTableId, {
-      productId: product.id,
-      productName: product.name,
-      price: product.price,
-      quantity: 1,
-    });
+    try {
+      await addOrderItem(selectedTableId, {
+        productId: product.id,
+        productName: product.name,
+        price: product.price,
+        quantity: 1,
+      });
+    } catch (error) {
+      console.error('Error adding product to order:', error);
+    }
   };
 
   return (

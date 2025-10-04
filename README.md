@@ -146,13 +146,11 @@ Set the hourly rate for table usage in the backend `.env` file:
 HOURLY_RATE=15
 ```
 
-### Default Products
-The system comes with pre-configured products:
-- **Drinks**: Coca Cola, Pepsi, Sprite, Beer, Water
-- **Food**: Chips, Noodles, Sandwich, Pizza Slice, Hot Dog
-
 ### Table Count
 Default setup includes 8 tables (Table 1-8). Modify the migration script to change this.
+
+### Products
+Products can be added through the Inventory management system. No default products are included.
 
 ## 📱 Display Screen
 
