@@ -1,24 +1,50 @@
 export interface Table {
   id: number;
   name: string;
+  status: 'available' | 'occupied' | 'stopped';
   isActive: boolean;
   startTime: number | null;
+  endTime: number | null;
   mode: 'open' | 'hour' | null;
-  orders: OrderItem[];
+  sessionId?: number;
+  orders?: OrderItem[];
 }
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
-  price: number;
+  price: number | string; // Can be number or string from database
   category: 'drink' | 'food';
 }
 
 export interface OrderItem {
-  productId: string;
+  id?: number;
+  productId: number;
   productName: string;
-  price: number;
+  price: number | string; // Can be number or string from database
   quantity: number;
+  tableId: number;
+  createdAt?: string;
+}
+
+export interface TimeSession {
+  id: number;
+  tableId: number;
+  startTime: string;
+  endTime?: string;
+  totalMinutes?: number;
+  cost?: number;
+  mode: 'open' | 'hour';
+}
+
+export interface Transaction {
+  id: number;
+  tableId: number;
+  totalAmount: number;
+  timeCost: number;
+  productCost: number;
+  date: string;
+  tableName?: string;
 }
 
 export interface PosState {
@@ -26,4 +52,57 @@ export interface PosState {
   products: Product[];
   selectedTableId: number | null;
   hourlyRate: number;
+}
+
+export interface DailyReport {
+  date: string;
+  summary: {
+    totalRevenue: number;
+    totalTimeRevenue: number;
+    totalProductRevenue: number;
+    totalTransactions: number;
+  };
+  transactions: Transaction[];
+  timeSessions: TimeSession[];
+}
+
+export interface WeeklyReport {
+  startDate: string;
+  endDate: string;
+  summary: {
+    totalRevenue: number;
+    totalTransactions: number;
+    averageDailyRevenue: number;
+  };
+  dailyData: Array<{
+    date: string;
+    transactionCount: number;
+    totalRevenue: number;
+    timeRevenue: number;
+    productRevenue: number;
+  }>;
+}
+
+export interface MonthlyReport {
+  year: number;
+  month: number;
+  summary: {
+    totalRevenue: number;
+    totalTransactions: number;
+    averageDailyRevenue: number;
+  };
+  dailyData: Array<{
+    date: string;
+    transactionCount: number;
+    totalRevenue: number;
+    timeRevenue: number;
+    productRevenue: number;
+  }>;
+  weeklyData: Array<{
+    weekNumber: number;
+    transactionCount: number;
+    totalRevenue: number;
+    timeRevenue: number;
+    productRevenue: number;
+  }>;
 }

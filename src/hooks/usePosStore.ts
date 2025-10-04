@@ -1,177 +1,533 @@
-import { useState, useEffect } from 'react';
-import { PosState, Table, Product } from '@/types/pos';
+import { create } from 'zustand';
+import { Table, Product, OrderItem, PosState } from '@/types/pos';
+import { apiClient } from '@/lib/api';
+import { websocketService } from '@/lib/websocket';
 
-const STORAGE_KEY = 'billiard-pos-state';
-const HOURLY_RATE = 50; // Price per hour
+interface PosStore extends PosState {
+  isLoading: boolean;
+  error: string | null;
+  halfHourRate: number;
+  setTables: (tables: Table[]) => void;
+  setProducts: (products: Product[]) => void;
+  setSelectedTable: (tableId: number | null) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  setHourlyRate: (rate: number) => void;
+  setHalfHourRate: (rate: number) => void;
+  setTableCount: (count: number) => Promise<void>;
+  
+  // API calls
+  fetchTables: () => Promise<void>;
+  fetchProducts: () => Promise<void>;
+  addOrderItem: (tableId: number, item: Omit<OrderItem, 'id' | 'tableId'>) => Promise<void>;
+  updateOrderQuantity: (orderId: number, quantity: number) => Promise<void>;
+  removeOrderItem: (orderId: number) => Promise<void>;
+  clearTableOrders: (tableId: number) => Promise<void>;
+  startTableSession: (tableId: number, mode: 'open' | 'hour') => Promise<void>;
+  stopTableSession: (tableId: number) => Promise<void>;
+  resetTable: (tableId: number) => Promise<void>;
+  checkoutTable: (tableId: number, paymentMethod?: 'cash' | 'gcash', referenceNumber?: string) => Promise<void>;
+  saveSettings: (settings: { hourlyRate: number; halfHourRate: number; tableCount?: number }) => Promise<void>;
+  
+  // Product management
+  createProduct: (product: Omit<Product, 'id'>) => Promise<void>;
+  updateProduct: (id: number, product: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: number) => Promise<void>;
+  
+  // Helper methods
+  getSelectedTable: () => Table | null;
+  getTableOrders: (tableId: number) => OrderItem[];
+  calculateTableTotal: (tableId: number) => { timeCost: number; productCost: number; total: number };
+  calculateOpenTimeCost: (elapsedSeconds: number) => { totalCost: number; breakdown: string };
+}
 
-const initialProducts: Product[] = [
-  { id: '1', name: 'Softdrink', price: 15, category: 'drink' },
-  { id: '2', name: 'Beer', price: 35, category: 'drink' },
-  { id: '3', name: 'Water', price: 10, category: 'drink' },
-  { id: '4', name: 'Chips', price: 20, category: 'food' },
-  { id: '5', name: 'Sandwich', price: 45, category: 'food' },
-  { id: '6', name: 'Fries', price: 30, category: 'food' },
-];
-
-const initialTables: Table[] = Array.from({ length: 8 }, (_, i) => ({
-  id: i + 1,
-  name: `Table ${i + 1}`,
-  isActive: false,
-  startTime: null,
-  mode: null,
-  orders: [],
-}));
-
-export function usePosStore() {
-  const [state, setState] = useState<PosState>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
+// Load settings from localStorage on initialization
+const loadSettings = () => {
+  try {
+    const savedSettings = localStorage.getItem('posSettings');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      return {
+        hourlyRate: settings.hourlyRate || 150,
+        halfHourRate: settings.halfHourRate || 100,
+      };
     }
-    return {
-      tables: initialTables,
-      products: initialProducts,
-      selectedTableId: null,
-      hourlyRate: HOURLY_RATE,
-    };
+  } catch (error) {
+    console.error('Failed to load settings from localStorage:', error);
+  }
+  return {
+    hourlyRate: 150,
+    halfHourRate: 100,
+  };
+};
+
+// Load products from localStorage on initialization
+const loadProducts = () => {
+  try {
+    const savedProducts = localStorage.getItem('posProducts');
+    if (savedProducts) {
+      return JSON.parse(savedProducts);
+    }
+  } catch (error) {
+    console.error('Failed to load products from localStorage:', error);
+  }
+  // Default products
+  return [
+    { id: 1, name: 'Coca Cola', price: 25, category: 'drink' as const },
+    { id: 2, name: 'Pepsi', price: 25, category: 'drink' as const },
+    { id: 3, name: 'Sprite', price: 25, category: 'drink' as const },
+    { id: 4, name: 'Beer', price: 40, category: 'drink' as const },
+    { id: 5, name: 'Water', price: 15, category: 'drink' as const },
+    { id: 6, name: 'Chips', price: 30, category: 'food' as const },
+    { id: 7, name: 'Noodles', price: 50, category: 'food' as const },
+    { id: 8, name: 'Sandwich', price: 60, category: 'food' as const },
+    { id: 9, name: 'Pizza Slice', price: 45, category: 'food' as const },
+    { id: 10, name: 'Hot Dog', price: 35, category: 'food' as const }
+  ];
+};
+
+const initialSettings = loadSettings();
+const initialProducts = loadProducts();
+
+export const usePosStore = create<PosStore>((set, get) => {
+  // Initialize WebSocket connection
+  websocketService.connect();
+  
+  // Set up WebSocket listeners
+  websocketService.onTableUpdate((data) => {
+    const { tables } = get();
+    const updatedTables = tables.map(table => 
+      table.id === data.tableId ? { ...table, ...data.data } : table
+    );
+    set({ tables: updatedTables });
   });
 
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    // Dispatch storage event for cross-tab sync
-    window.dispatchEvent(new Event('storage'));
-  }, [state]);
+  websocketService.onProductUpdate((data) => {
+    set({ products: data });
+  });
 
-  // Listen for storage changes from other tabs
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setState(JSON.parse(stored));
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  const startTable = (tableId: number, mode: 'open' | 'hour') => {
-    setState(prev => ({
-      ...prev,
-      tables: prev.tables.map(table =>
-        table.id === tableId
-          ? { ...table, isActive: true, startTime: Date.now(), mode }
-          : table
-      ),
-    }));
-  };
-
-  const stopTable = (tableId: number) => {
-    setState(prev => ({
-      ...prev,
-      tables: prev.tables.map(table =>
-        table.id === tableId
-          ? { ...table, isActive: false, startTime: null, mode: null }
-          : table
-      ),
-    }));
-  };
-
-  const addOrder = (tableId: number, productId: string) => {
-    const product = state.products.find(p => p.id === productId);
-    if (!product) return;
-
-    setState(prev => ({
-      ...prev,
-      tables: prev.tables.map(table => {
-        if (table.id !== tableId) return table;
-
-        const existingOrder = table.orders.find(o => o.productId === productId);
-        if (existingOrder) {
-          return {
-            ...table,
-            orders: table.orders.map(o =>
-              o.productId === productId
-                ? { ...o, quantity: o.quantity + 1 }
-                : o
-            ),
-          };
-        } else {
-          return {
-            ...table,
-            orders: [
-              ...table.orders,
-              {
-                productId: product.id,
-                productName: product.name,
-                price: product.price,
-                quantity: 1,
-              },
-            ],
-          };
-        }
-      }),
-    }));
-  };
-
-  const removeOrder = (tableId: number, productId: string) => {
-    setState(prev => ({
-      ...prev,
-      tables: prev.tables.map(table => {
-        if (table.id !== tableId) return table;
-
-        const existingOrder = table.orders.find(o => o.productId === productId);
-        if (!existingOrder) return table;
-
-        if (existingOrder.quantity > 1) {
-          return {
-            ...table,
-            orders: table.orders.map(o =>
-              o.productId === productId
-                ? { ...o, quantity: o.quantity - 1 }
-                : o
-            ),
-          };
-        } else {
-          return {
-            ...table,
-            orders: table.orders.filter(o => o.productId !== productId),
-          };
-        }
-      }),
-    }));
-  };
-
-  const checkout = (tableId: number) => {
-    setState(prev => ({
-      ...prev,
-      tables: prev.tables.map(table =>
-        table.id === tableId
-          ? {
-              ...table,
-              isActive: false,
-              startTime: null,
-              mode: null,
-              orders: [],
-            }
-          : table
-      ),
-      selectedTableId: null,
-    }));
-  };
-
-  const selectTable = (tableId: number | null) => {
-    setState(prev => ({ ...prev, selectedTableId: tableId }));
-  };
+  websocketService.onSettingsUpdate((data) => {
+    set({ 
+      hourlyRate: data.hourlyRate,
+      halfHourRate: data.halfHourRate
+    });
+  });
 
   return {
-    state,
-    startTable,
-    stopTable,
-    addOrder,
-    removeOrder,
-    checkout,
-    selectTable,
+    tables: [],
+    products: initialProducts,
+    selectedTableId: null,
+    hourlyRate: initialSettings.hourlyRate,
+    halfHourRate: initialSettings.halfHourRate,
+    isLoading: false,
+    error: null,
+
+  setTables: (tables) => set({ tables }),
+  setProducts: (products) => set({ products }),
+  setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
+  setLoading: (loading) => set({ isLoading: loading }),
+  setError: (error) => set({ error }),
+  setHourlyRate: (rate) => set({ hourlyRate: rate }),
+  setHalfHourRate: (rate) => set({ halfHourRate: rate }),
+  setTableCount: async (count) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Update table count via API
+      const response = await apiClient.updateTableCount(count);
+      
+      // Update local state with the response from server
+      set({ tables: response.tables, isLoading: false });
+    } catch (error) {
+      console.error('Failed to update table count:', error);
+      
+      // Fallback to local update if API fails
+      const { tables } = get();
+      const newTables = [];
+      
+      // Create new tables if count increased
+      for (let i = 1; i <= count; i++) {
+        const existingTable = tables.find(t => t.id === i);
+        if (existingTable) {
+          newTables.push(existingTable);
+        } else {
+          newTables.push({
+            id: i,
+            name: `Table ${i}`,
+            status: 'available' as const,
+            isActive: false,
+            startTime: null,
+            mode: null,
+            orders: []
+          });
+        }
+      }
+      
+      set({ tables: newTables, isLoading: false });
+    }
+  },
+
+  fetchTables: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      const tables = await apiClient.getTables();
+      set({ tables, isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch tables', isLoading: false });
+    }
+  },
+
+  fetchProducts: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      const products = await apiClient.getProducts();
+      set({ products, isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch products', isLoading: false });
+    }
+  },
+
+  addOrderItem: async (tableId, item) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.addOrderItem({
+        tableId,
+        productId: item.productId,
+        productName: item.productName,
+        price: item.price,
+        quantity: item.quantity,
+      });
+      
+      // Refresh tables to get updated orders
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to add order item', isLoading: false });
+    }
+  },
+
+  updateOrderQuantity: async (orderId, quantity) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.updateOrderQuantity(orderId, quantity);
+      
+      // Refresh tables to get updated orders
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update order quantity', isLoading: false });
+    }
+  },
+
+  removeOrderItem: async (orderId) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.deleteOrderItem(orderId);
+      
+      // Refresh tables to get updated orders
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to remove order item', isLoading: false });
+    }
+  },
+
+  clearTableOrders: async (tableId) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.clearTableOrders(tableId);
+      
+      // Refresh tables to get updated orders
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to clear table orders', isLoading: false });
+    }
+  },
+
+  startTableSession: async (tableId, mode) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.startTableSession(tableId, mode);
+      
+      // Refresh tables to get updated session info
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to start table session', isLoading: false });
+    }
+  },
+
+  stopTableSession: async (tableId) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.stopTableSession(tableId);
+      
+      // Refresh tables to get updated session info
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to stop table session', isLoading: false });
+    }
+  },
+
+  resetTable: async (tableId) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.resetTable(tableId);
+      
+      // Refresh tables to get updated session info
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to reset table', isLoading: false });
+    }
+  },
+
+  checkoutTable: async (tableId) => {
+    try {
+      set({ isLoading: true, error: null });
+      const { timeCost, productCost, total } = get().calculateTableTotal(tableId);
+      
+      await apiClient.createTransaction({
+        tableId,
+        timeCost,
+        productCost,
+        totalAmount: total,
+      });
+      
+      // Refresh tables after checkout
+      await get().fetchTables();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to checkout table', isLoading: false });
+    }
+  },
+
+  getSelectedTable: () => {
+    const { tables, selectedTableId } = get();
+    return tables.find(table => table.id === selectedTableId) || null;
+  },
+
+  getTableOrders: (tableId) => {
+    const { tables } = get();
+    const table = tables.find(table => table.id === tableId);
+    return table?.orders || [];
+  },
+
+  calculateTableTotal: (tableId) => {
+    const { tables, hourlyRate, halfHourRate } = get();
+    const table = tables.find(table => table.id === tableId);
+    
+    if (!table) return { timeCost: 0, productCost: 0, total: 0 };
+
+    // Calculate time cost
+    let timeCost = 0;
+    if (table.startTime) {
+      // Use endTime if session is stopped, otherwise use current time
+      const endTime = table.endTime || Date.now();
+      const elapsedSeconds = Math.floor((endTime - table.startTime) / 1000);
+      
+      if (table.mode === 'open') {
+        // Use new Open Time pricing logic
+        const { totalCost } = get().calculateOpenTimeCost(elapsedSeconds);
+        timeCost = totalCost;
+      } else {
+        // Use old hourly rate for hour mode
+        const elapsedMinutes = Math.ceil(elapsedSeconds / 60);
+        timeCost = (elapsedMinutes / 60) * hourlyRate;
+      }
+    }
+
+    // Calculate product cost
+    const productCost = (table.orders || []).reduce((sum, order) => {
+      return sum + (Number(order.price) * order.quantity);
+    }, 0);
+
+    return {
+      timeCost,
+      productCost,
+      total: timeCost + productCost,
+    };
+  },
+
+  calculateOpenTimeCost: (elapsedSeconds) => {
+    const { hourlyRate, halfHourRate } = get();
+    const totalMinutes = Math.floor(elapsedSeconds / 60);
+    
+    // Open Time Rate Logic:
+    // 0-30 mins: ₱100 (halfHourRate)
+    // 31-60 mins: ₱150 (hourlyRate)
+    // Beyond first hour: Every completed 30-min block alternates between adding ₱100 and ₱50
+    
+    let totalCost = 0;
+    let breakdown = '';
+    
+    if (totalMinutes < 31) {
+      // First 30 minutes
+      totalCost = halfHourRate;
+      breakdown = `0-30min ₱${halfHourRate}`;
+    } else if (totalMinutes < 61) {
+      // 31-60 minutes (first hour)
+      totalCost = hourlyRate;
+      breakdown = `First hour ₱${hourlyRate}`;
+    } else {
+      // Beyond first hour
+      totalCost = hourlyRate; // First hour costs ₱150
+      const minutesBeyondFirstHour = totalMinutes - 60;
+      
+      // Count completed 30-minute blocks beyond the first hour
+      const completed30MinBlocks = Math.floor(minutesBeyondFirstHour / 30);
+      
+      // Each block alternates: ₱100, ₱50, ₱100, ₱50, etc.
+      for (let i = 0; i < completed30MinBlocks; i++) {
+        if (i % 2 === 0) {
+          totalCost += halfHourRate; // ₱100
+        } else {
+          totalCost += (hourlyRate - halfHourRate); // ₱50
+        }
+      }
+      
+      // Build breakdown string
+      const fullHours = Math.floor(totalMinutes / 60);
+      const extraBlocks = completed30MinBlocks;
+      
+      if (extraBlocks === 0) {
+        breakdown = `${fullHours} hr ₱${hourlyRate}`;
+      } else if (extraBlocks === 1) {
+        breakdown = `${fullHours} hr ₱${hourlyRate} + 30min ₱${halfHourRate}`;
+      } else {
+        const additionalHours = Math.floor(extraBlocks / 2);
+        const extraHalfHour = extraBlocks % 2;
+        
+        breakdown = `${fullHours} hr ₱${hourlyRate}`;
+        if (additionalHours > 0) {
+          breakdown += ` + ${additionalHours} hr ₱${hourlyRate}`;
+        }
+        if (extraHalfHour > 0) {
+          breakdown += ` + 30min ₱${halfHourRate}`;
+        }
+      }
+    }
+    
+    return {
+      totalCost: Math.round(totalCost * 100) / 100, // Round to 2 decimal places
+      breakdown
+    };
+  },
+
+  saveSettings: async (settings) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Save to localStorage
+      localStorage.setItem('posSettings', JSON.stringify(settings));
+      
+      // Update store
+      set({ 
+        hourlyRate: settings.hourlyRate,
+        halfHourRate: settings.halfHourRate,
+        isLoading: false 
+      });
+      
+      // Update table count if provided
+      if (settings.tableCount) {
+        await get().setTableCount(settings.tableCount);
+      }
+      
+      // Try to save to backend API if connected
+      try {
+        await apiClient.saveSettings(settings);
+      } catch (apiError) {
+        // If API fails, settings are still saved locally
+        console.warn('Failed to save settings to backend, using local storage only:', apiError);
+      }
+      
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to save settings', isLoading: false });
+    }
+  },
+
+  // Product management methods
+  createProduct: async (product) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Try to create via API first
+      try {
+        const newProduct = await apiClient.createProduct(product);
+        const { products } = get();
+        set({ products: [...products, newProduct], isLoading: false });
+      } catch (apiError) {
+        // Fallback to local storage
+        const { products } = get();
+        const newProduct = {
+          ...product,
+          id: Math.max(...products.map(p => p.id), 0) + 1
+        };
+        set({ products: [...products, newProduct], isLoading: false });
+        
+        // Save to localStorage
+        localStorage.setItem('posProducts', JSON.stringify([...products, newProduct]));
+      }
+      
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to create product', isLoading: false });
+    }
+  },
+
+  updateProduct: async (id, product) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Try to update via API first
+      try {
+        const updatedProduct = await apiClient.updateProduct(id, product);
+        const { products } = get();
+        set({ 
+          products: products.map(p => p.id === id ? updatedProduct : p), 
+          isLoading: false 
+        });
+      } catch (apiError) {
+        // Fallback to local storage
+        const { products } = get();
+        set({ 
+          products: products.map(p => p.id === id ? { ...p, ...product } : p), 
+          isLoading: false 
+        });
+        
+        // Save to localStorage
+        const updatedProducts = products.map(p => p.id === id ? { ...p, ...product } : p);
+        localStorage.setItem('posProducts', JSON.stringify(updatedProducts));
+      }
+      
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update product', isLoading: false });
+    }
+  },
+
+  deleteProduct: async (id) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Try to delete via API first
+      try {
+        await apiClient.deleteProduct(id);
+        const { products } = get();
+        set({ products: products.filter(p => p.id !== id), isLoading: false });
+      } catch (apiError) {
+        // Fallback to local storage
+        const { products } = get();
+        set({ products: products.filter(p => p.id !== id), isLoading: false });
+        
+        // Save to localStorage
+        const updatedProducts = products.filter(p => p.id !== id);
+        localStorage.setItem('posProducts', JSON.stringify(updatedProducts));
+      }
+      
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to delete product', isLoading: false });
+    }
+  },
   };
-}
+});

@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PosScreen from "./pages/PosScreen";
 import DisplayScreen from "./pages/DisplayScreen";
+import ReportsScreen from "./pages/ReportsScreen";
+import SettingsScreen from "./pages/SettingsScreen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -14,10 +16,17 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
           <Route path="/" element={<PosScreen />} />
           <Route path="/display" element={<DisplayScreen />} />
+          <Route path="/reports" element={<ReportsScreen />} />
+          <Route path="/settings" element={<SettingsScreen />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
