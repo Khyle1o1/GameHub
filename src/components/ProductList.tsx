@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/types/pos';
 import { usePosStore } from '@/hooks/usePosStore';
+import { formatCurrency } from '@/lib/utils';
 
 interface ProductListProps {
   products: Product[];
@@ -18,9 +19,8 @@ export function ProductList({ products, disabled }: ProductListProps) {
   const others = products.filter(p => p.category === 'other');
 
   const handleAddProduct = async (product: Product) => {
-    if (!selectedTableId) return;
-    
     try {
+      // Allow adding products even without a table selected (for standalone orders)
       await addOrderItem(selectedTableId, {
         productId: product.id,
         productName: product.name,
@@ -54,7 +54,7 @@ export function ProductList({ products, disabled }: ProductListProps) {
               >
                 <div className="flex-1">
                   <div className="font-medium" style={{ color: '#2C313A' }}>{product.name}</div>
-                  <div className="text-sm" style={{ color: '#404750' }}>₱{Number(product.price).toFixed(2)}</div>
+                  <div className="text-sm" style={{ color: '#404750' }}>₱{formatCurrency(product.price)}</div>
                 </div>
                 <Button
                   size="sm"
@@ -94,7 +94,7 @@ export function ProductList({ products, disabled }: ProductListProps) {
               >
                 <div className="flex-1">
                   <div className="font-medium" style={{ color: '#2C313A' }}>{product.name}</div>
-                  <div className="text-sm" style={{ color: '#404750' }}>₱{Number(product.price).toFixed(2)}</div>
+                  <div className="text-sm" style={{ color: '#404750' }}>₱{formatCurrency(product.price)}</div>
                 </div>
                 <Button
                   size="sm"
@@ -135,7 +135,7 @@ export function ProductList({ products, disabled }: ProductListProps) {
                 >
                   <div className="flex-1">
                     <div className="font-medium" style={{ color: '#2C313A' }}>{product.name}</div>
-                    <div className="text-sm" style={{ color: '#404750' }}>₱{Number(product.price).toFixed(2)}</div>
+                    <div className="text-sm" style={{ color: '#404750' }}>₱{formatCurrency(product.price)}</div>
                   </div>
                   <Button
                     size="sm"
@@ -177,7 +177,7 @@ export function ProductList({ products, disabled }: ProductListProps) {
                 >
                   <div className="flex-1">
                     <div className="font-medium" style={{ color: '#2C313A' }}>{product.name}</div>
-                    <div className="text-sm" style={{ color: '#404750' }}>₱{Number(product.price).toFixed(2)}</div>
+                    <div className="text-sm" style={{ color: '#404750' }}>₱{formatCurrency(product.price)}</div>
                   </div>
                   <Button
                     size="sm"

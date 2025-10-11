@@ -19,15 +19,29 @@ router.get('/table/:tableId', async (req, res) => {
   }
 });
 
+// Get standalone orders (orders without a table)
+router.get('/standalone', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM orders WHERE table_id IS NULL ORDER BY created_at DESC',
+      []
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching standalone orders:', error);
+    res.status(500).json({ error: 'Failed to fetch standalone orders' });
+  }
+});
+
 // Add order item
 router.post('/', async (req, res) => {
   const { tableId, productId, productName, price, quantity } = req.body;
 
   try {
-    // Check if the same product already exists for this table
+    // Check if the same product already exists for this table (or standalone if no table)
     const existingOrder = await pool.query(
       'SELECT * FROM orders WHERE table_id = $1 AND product_id = $2',
-      [tableId, productId]
+      [tableId || null, productId]
     );
 
     let result;
@@ -42,7 +56,7 @@ router.post('/', async (req, res) => {
       // Create new order
       result = await pool.query(
         'INSERT INTO orders (table_id, product_id, product_name, price, quantity) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [tableId, productId, productName, price, quantity]
+        [tableId || null, productId, productName, price, quantity]
       );
     }
 
@@ -116,6 +130,21 @@ router.delete('/table/:tableId/clear', async (req, res) => {
   } catch (error) {
     console.error('Error clearing orders:', error);
     res.status(500).json({ error: 'Failed to clear orders' });
+  }
+});
+
+// Clear all standalone orders
+router.delete('/standalone/clear', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM orders WHERE table_id IS NULL', []);
+
+    const io = req.app.get('io');
+    io.emit('standaloneOrdersCleared', {});
+
+    res.json({ message: 'All standalone orders cleared' });
+  } catch (error) {
+    console.error('Error clearing standalone orders:', error);
+    res.status(500).json({ error: 'Failed to clear standalone orders' });
   }
 });
 

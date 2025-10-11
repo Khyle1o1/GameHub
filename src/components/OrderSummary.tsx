@@ -1,10 +1,11 @@
-import { Minus, Plus, Receipt, Trash2 } from 'lucide-react';
+import { Minus, Plus, Receipt, Trash2, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Table } from '@/types/pos';
 import { usePosStore } from '@/hooks/usePosStore';
 import { PaymentModal } from '@/components/PaymentModal';
+import { formatCurrency } from '@/lib/utils';
 import { useState } from 'react';
 
 interface OrderSummaryProps {
@@ -12,65 +13,111 @@ interface OrderSummaryProps {
 }
 
 export function OrderSummary({ table }: OrderSummaryProps) {
-  const { hourlyRate, updateOrderQuantity, removeOrderItem, checkoutTable, calculateTableTotal, calculateOpenTimeCost } = usePosStore();
+  const { 
+    hourlyRate, 
+    standaloneOrders,
+    updateOrderQuantity, 
+    removeOrderItem, 
+    checkoutTable, 
+    checkoutStandaloneOrders,
+    calculateTableTotal, 
+    calculateStandaloneTotal,
+    calculateOpenTimeCost,
+    setSelectedTable
+  } = usePosStore();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  if (!table) {
+  // Determine if we're showing table orders or standalone orders
+  const isTableMode = table !== null;
+  const orders = isTableMode ? (table?.orders || []) : standaloneOrders;
+  
+  let timeCost = 0;
+  let productCost = 0;
+  let total = 0;
+  
+  if (isTableMode) {
+    const tableTotals = calculateTableTotal(table.id);
+    timeCost = tableTotals.timeCost;
+    productCost = tableTotals.productCost;
+    total = tableTotals.total;
+  } else {
+    const standaloneTotals = calculateStandaloneTotal();
+    productCost = standaloneTotals.productCost;
+    total = standaloneTotals.total;
+  }
+
+  // Show empty state if no orders
+  if (orders.length === 0 && !isTableMode) {
     return (
-      <Card className="h-full shadow-sm" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-        <CardHeader style={{ backgroundColor: '#2C313A' }}>
-          <CardTitle className="text-lg text-white font-semibold">Order Summary</CardTitle>
+      <Card className="shadow-sm" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+        <CardHeader style={{ backgroundColor: '#2C313A' }} className="py-3">
+          <CardTitle className="text-base text-white font-semibold">Order Summary</CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="text-center py-12">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#9B9182' }}>
-              <span className="text-2xl">📋</span>
+        <CardContent className="p-4">
+          <div className="text-center py-6">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#9B9182' }}>
+              <span className="text-lg">🛒</span>
             </div>
-            <p className="text-lg font-medium" style={{ color: '#2C313A' }}>Select a table to view orders</p>
-            <p className="text-sm mt-2" style={{ color: '#404750' }}>Choose a table from the left to start managing orders</p>
+            <p className="text-sm font-medium" style={{ color: '#2C313A' }}>No orders yet</p>
+            <p className="text-xs mt-1" style={{ color: '#404750' }}>Add products to get started</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  const { timeCost, productCost, total } = calculateTableTotal(table.id);
-
   return (
-    <Card className="h-full flex flex-col shadow-sm" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-      <CardHeader style={{ backgroundColor: '#2C313A' }}>
-        <CardTitle className="text-lg text-white font-semibold">{table.name} - Order Summary</CardTitle>
+    <Card className="shadow-sm" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+      <CardHeader style={{ backgroundColor: '#2C313A' }} className="py-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base text-white font-semibold">
+            {isTableMode ? `${table.name} - Order Summary` : 'Order Summary'}
+          </CardTitle>
+          {isTableMode && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelectedTable(null)}
+              className="h-6 w-6 p-0"
+              style={{ 
+                borderColor: '#9B9182', 
+                color: '#E8E0D2',
+                backgroundColor: 'transparent'
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col p-4">
-        <div className="flex-1 space-y-4">
-          {/* Time Fee */}
-          {(table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') && (
-            <div className="p-4 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-              <div className="font-semibold mb-3 flex items-center gap-2" style={{ color: '#2C313A' }}>
-                <span className="text-lg">⏱️</span>
+      <CardContent className="flex flex-col p-3">
+        <div className="space-y-3">
+          {/* Time Fee - Only for table mode */}
+          {isTableMode && (table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') && (
+            <div className="p-3 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+              <div className="font-semibold mb-2 flex items-center gap-2" style={{ color: '#2C313A' }}>
+                <span className="text-base">⏱️</span>
                 Time Fee
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
                   <span style={{ color: '#404750' }}>
                     {table.mode === 'open' ? 'Open Time Rate' : 
-                     table.mode === 'countdown' ? 'Countdown Timer' : 'Hourly Rate'}: ₱{hourlyRate}/hr
+                     table.mode === 'countdown' ? 'Countdown Timer' : 'Hourly Rate'}: ₱{formatCurrency(hourlyRate)}/hr
                   </span>
-                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>
+                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{formatCurrency(timeCost)}</span>
                 </div>
                 
                 {/* Countdown Mode Details */}
                 {table.mode === 'countdown' && (
-                  <div className="space-y-2">
-                    <div className="text-xs p-2 rounded" style={{ backgroundColor: '#9B9182', color: '#E8E0D2' }}>
-                      <div className="font-medium mb-1">Countdown Details:</div>
-                      <div>Initial Duration: {Math.floor((table.countdownDuration || 0) / 60)} minutes</div>
-                      {table.timeExtensions && table.timeExtensions.length > 0 && (
-                        <div>
-                          Extensions: {table.timeExtensions.length} × {table.timeExtensions.map(ext => Math.floor(ext.addedDuration / 60)).join(', ')} min
-                        </div>
-                      )}
-                    </div>
+                  <div className="text-xs p-2 rounded" style={{ backgroundColor: '#9B9182', color: '#E8E0D2' }}>
+                    <div className="font-medium mb-1">Countdown Details:</div>
+                    <div>Initial Duration: {Math.floor((table.countdownDuration || 0) / 60)} minutes</div>
+                    {table.timeExtensions && table.timeExtensions.length > 0 && (
+                      <div>
+                        Extensions: {table.timeExtensions.length} × {table.timeExtensions.map(ext => Math.floor(ext.addedDuration / 60)).join(', ')} min
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -91,26 +138,26 @@ export function OrderSummary({ table }: OrderSummaryProps) {
           )}
 
           {/* Orders */}
-          {table.orders && table.orders.length > 0 && (
+          {orders.length > 0 && (
             <div>
-              <div className="font-semibold mb-3 flex items-center gap-2" style={{ color: '#2C313A' }}>
-                <span className="text-lg">🛒</span>
+              <div className="font-semibold mb-2 flex items-center gap-2" style={{ color: '#2C313A' }}>
+                <span className="text-base">🛒</span>
                 Orders
               </div>
-              <div className="space-y-3">
-                {table.orders.map(order => (
+              <div className="space-y-2">
+                {orders.map(order => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between p-3 rounded-lg border transition-colors"
+                    className="flex items-center justify-between p-2 rounded-lg border transition-colors"
                     style={{ 
                       borderColor: '#9B9182',
                       backgroundColor: '#E8E0D2'
                     }}
                   >
                     <div className="flex-1">
-                      <div className="font-medium text-sm" style={{ color: '#2C313A' }}>{order.productName}</div>
+                      <div className="font-medium text-xs" style={{ color: '#2C313A' }}>{order.productName}</div>
                       <div className="text-xs" style={{ color: '#404750' }}>
-                        ₱{Number(order.price).toFixed(2)} × {order.quantity}
+                        ₱{formatCurrency(order.price)} × {order.quantity}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -126,7 +173,7 @@ export function OrderSummary({ table }: OrderSummaryProps) {
                             }
                           }
                         }}
-                        className="h-7 w-7 p-0"
+                        className="h-6 w-6 p-0"
                         style={{ 
                           borderColor: '#9B9182', 
                           color: '#2C313A',
@@ -135,7 +182,7 @@ export function OrderSummary({ table }: OrderSummaryProps) {
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <span className="w-8 text-center font-semibold" style={{ color: '#2C313A' }}>{order.quantity}</span>
+                      <span className="w-6 text-center font-semibold text-xs" style={{ color: '#2C313A' }}>{order.quantity}</span>
                       <Button
                         size="sm"
                         variant="outline"
@@ -144,7 +191,7 @@ export function OrderSummary({ table }: OrderSummaryProps) {
                             updateOrderQuantity(order.id, order.quantity + 1);
                           }
                         }}
-                        className="h-7 w-7 p-0"
+                        className="h-6 w-6 p-0"
                         style={{ 
                           borderColor: '#9B9182', 
                           color: '#2C313A',
@@ -153,8 +200,8 @@ export function OrderSummary({ table }: OrderSummaryProps) {
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
-                      <span className="w-16 text-right font-semibold" style={{ color: '#2C313A' }}>
-                        ₱{(Number(order.price) * order.quantity).toFixed(2)}
+                      <span className="w-12 text-right font-semibold text-xs" style={{ color: '#2C313A' }}>
+                        ₱{formatCurrency(Number(order.price) * order.quantity)}
                       </span>
                     </div>
                   </div>
@@ -163,41 +210,41 @@ export function OrderSummary({ table }: OrderSummaryProps) {
             </div>
           )}
 
-          {(!table.orders || table.orders.length === 0) && !table.isActive && table.status !== 'stopped' && (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#9B9182' }}>
-                <span className="text-xl">📝</span>
+          {orders.length === 0 && (!isTableMode || (!table.isActive && table.status !== 'stopped')) && (
+            <div className="text-center py-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#9B9182' }}>
+                <span className="text-lg">📝</span>
               </div>
-              <p className="font-medium" style={{ color: '#2C313A' }}>No orders yet</p>
-              <p className="text-sm mt-1" style={{ color: '#404750' }}>Add products to get started</p>
+              <p className="font-medium text-sm" style={{ color: '#2C313A' }}>No orders yet</p>
+              <p className="text-xs mt-1" style={{ color: '#404750' }}>Add products to get started</p>
             </div>
           )}
         </div>
 
-        {/* Total & Checkout - Only show if table has active session or orders */}
-        {((table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') || (table.orders && table.orders.length > 0)) && (
-          <div className="space-y-4 pt-4" style={{ borderTop: '1px solid #9B9182' }}>
-            <div className="space-y-3 p-4 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
-              {(table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') && (
-                <div className="flex justify-between text-sm">
+        {/* Total & Checkout - Show if there are orders or active table session */}
+        {(orders.length > 0 || (isTableMode && (table.isActive || table.status === 'stopped' || table.status === 'needs_checkout'))) && (
+          <div className="space-y-3 pt-3" style={{ borderTop: '1px solid #9B9182' }}>
+            <div className="space-y-2 p-3 rounded-lg border" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+              {isTableMode && (table.isActive || table.status === 'stopped' || table.status === 'needs_checkout') && (
+                <div className="flex justify-between text-xs">
                   <span style={{ color: '#404750' }}>Time Fee</span>
-                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>
+                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{formatCurrency(timeCost)}</span>
                 </div>
               )}
-              {table.orders && table.orders.length > 0 && (
-                <div className="flex justify-between text-sm">
+              {orders.length > 0 && (
+                <div className="flex justify-between text-xs">
                   <span style={{ color: '#404750' }}>Orders Total</span>
-                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{productCost.toFixed(2)}</span>
+                  <span className="font-semibold" style={{ color: '#2C313A' }}>₱{formatCurrency(productCost)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-lg font-bold pt-2" style={{ borderTop: '1px solid #9B9182' }}>
+              <div className="flex justify-between text-sm font-bold pt-1" style={{ borderTop: '1px solid #9B9182' }}>
                 <span style={{ color: '#2C313A' }}>Grand Total</span>
-                <span style={{ color: '#2C313A' }}>₱{total.toFixed(2)}</span>
+                <span style={{ color: '#2C313A' }}>₱{formatCurrency(total)}</span>
               </div>
             </div>
             <Button
-              className="w-full text-white font-semibold py-3"
-              size="lg"
+              className="w-full text-white font-semibold py-2"
+              size="sm"
               onClick={() => setIsPaymentModalOpen(true)}
               disabled={total === 0}
               style={{ 
@@ -205,7 +252,7 @@ export function OrderSummary({ table }: OrderSummaryProps) {
                 color: '#E8E0D2'
               }}
             >
-              <Receipt className="h-5 w-5 mr-2" />
+              <Receipt className="h-4 w-4 mr-2" />
               Checkout
             </Button>
           </div>
@@ -219,7 +266,11 @@ export function OrderSummary({ table }: OrderSummaryProps) {
         table={table}
         totalAmount={total}
         onConfirmPayment={async (paymentMethod, referenceNumber) => {
-          await checkoutTable(table.id, paymentMethod, referenceNumber);
+          if (isTableMode) {
+            await checkoutTable(table.id, paymentMethod, referenceNumber);
+          } else {
+            await checkoutStandaloneOrders(paymentMethod, referenceNumber);
+          }
         }}
       />
     </Card>

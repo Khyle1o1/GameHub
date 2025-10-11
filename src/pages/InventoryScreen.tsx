@@ -12,6 +12,7 @@ import { usePosStore } from '@/hooks/usePosStore';
 import { Product } from '@/types/pos';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
 
 export default function InventoryScreen() {
   const navigate = useNavigate();
@@ -275,7 +276,7 @@ export default function InventoryScreen() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium" style={{ color: '#404750' }}>Total Value</p>
-                  <p className="text-2xl font-bold" style={{ color: '#2C313A' }}>₱{totalValue.toFixed(2)}</p>
+                  <p className="text-2xl font-bold" style={{ color: '#2C313A' }}>₱{formatCurrency(totalValue)}</p>
                 </div>
                 <TrendingUp className="h-8 w-8" style={{ color: '#404750' }} />
               </div>
@@ -504,10 +505,10 @@ export default function InventoryScreen() {
                           {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
                         </td>
                         <td className="p-4" style={{ color: '#404750' }}>
-                          ₱{Number(product.price).toFixed(2)}
+                          ₱{formatCurrency(product.price)}
                         </td>
                         <td className="p-4" style={{ color: '#404750' }}>
-                          ₱{Number(product.cost).toFixed(2)}
+                          ₱{formatCurrency(product.cost)}
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
@@ -535,7 +536,7 @@ export default function InventoryScreen() {
                           </div>
                         </td>
                         <td className="p-4" style={{ color: '#404750' }}>
-                          ₱{productValue.toFixed(2)}
+                          ₱{formatCurrency(productValue)}
                         </td>
                         <td className="p-4">
                           <div className="flex gap-2">

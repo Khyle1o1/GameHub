@@ -17,7 +17,8 @@ export default function PosScreen() {
     error,
     fetchTables, 
     fetchProducts, 
-    getSelectedTable 
+    getSelectedTable,
+    fetchStandaloneOrders
   } = usePosStore();
 
   const selectedTable = getSelectedTable();
@@ -26,6 +27,7 @@ export default function PosScreen() {
   useEffect(() => {
     fetchTables();
     fetchProducts();
+    fetchStandaloneOrders();
     
     // Update current time every second
     const timeInterval = setInterval(() => {
@@ -33,7 +35,7 @@ export default function PosScreen() {
     }, 1000);
 
     return () => clearInterval(timeInterval);
-  }, [fetchTables, fetchProducts]);
+  }, [fetchTables, fetchProducts, fetchStandaloneOrders]);
 
   if (isLoading && tables.length === 0) {
     return (
@@ -154,9 +156,9 @@ export default function PosScreen() {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Tables Grid */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             <div>
               <h2 className="text-2xl font-bold mb-4" style={{ color: '#2C313A' }}>Tables</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -174,13 +176,13 @@ export default function PosScreen() {
               <h2 className="text-2xl font-bold mb-4" style={{ color: '#2C313A' }}>Products</h2>
               <ProductList
                 products={products}
-                disabled={!selectedTableId}
+                disabled={false}
               />
             </div>
           </div>
 
           {/* Order Summary - Sticky on desktop */}
-          <div className="lg:sticky lg:top-8 lg:h-fit">
+          <div className="lg:col-span-2 lg:sticky lg:top-8 lg:h-fit max-w-sm">
             <OrderSummary
               table={selectedTable}
             />

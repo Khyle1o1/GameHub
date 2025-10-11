@@ -7,6 +7,7 @@ import { Table } from '@/types/pos';
 import { usePosStore } from '@/hooks/usePosStore';
 import { DurationSelector } from '@/components/DurationSelector';
 import { TimeExtensionModal } from '@/components/TimeExtensionModal';
+import { formatCurrency } from '@/lib/utils';
 
 interface TableCardProps {
   table: Table;
@@ -200,17 +201,17 @@ export function TableCard({ table }: TableCardProps) {
             <div className="grid grid-cols-1 gap-2 text-sm">
               <div className="flex justify-between">
                 <span style={{ color: '#404750' }}>Time Cost:</span>
-                <span className="font-medium" style={{ color: '#2C313A' }}>₱{timeCost.toFixed(2)}</span>
+                <span className="font-medium" style={{ color: '#2C313A' }}>₱{formatCurrency(timeCost)}</span>
               </div>
               {productCost > 0 && (
                 <div className="flex justify-between">
                   <span style={{ color: '#404750' }}>Products:</span>
-                  <span className="font-medium" style={{ color: '#2C313A' }}>₱{productCost.toFixed(2)}</span>
+                  <span className="font-medium" style={{ color: '#2C313A' }}>₱{formatCurrency(productCost)}</span>
                 </div>
               )}
               <div className="flex justify-between pt-2" style={{ borderTop: '1px solid #9B9182' }}>
                 <span className="font-semibold" style={{ color: '#2C313A' }}>Total:</span>
-                <span className="font-bold text-lg" style={{ color: '#2C313A' }}>₱{total.toFixed(2)}</span>
+                <span className="font-bold text-lg" style={{ color: '#2C313A' }}>₱{formatCurrency(total)}</span>
               </div>
             </div>
           </div>

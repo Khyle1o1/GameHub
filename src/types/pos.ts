@@ -50,7 +50,7 @@ export interface OrderItem {
   productName: string;
   price: number | string; // Can be number or string from database
   quantity: number;
-  tableId: number;
+  tableId: number | null; // Can be null for standalone orders
   createdAt?: string;
 }
 
@@ -68,12 +68,12 @@ export interface TimeSession {
 
 export interface Transaction {
   id: number;
-  tableId: number;
+  tableId: number | null; // Can be null for standalone transactions
   totalAmount: number;
   timeCost: number;
   productCost: number;
   date: string;
-  tableName?: string;
+  tableName?: string | null; // Can be null for standalone transactions
 }
 
 export interface PosState {
@@ -81,6 +81,7 @@ export interface PosState {
   products: Product[];
   selectedTableId: number | null;
   hourlyRate: number;
+  standaloneOrders: OrderItem[];
 }
 
 export interface DailyReport {

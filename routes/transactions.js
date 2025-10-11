@@ -17,23 +17,28 @@ router.post('/', async (req, res) => {
       // Create transaction record
       const transactionResult = await client.query(
         'INSERT INTO transactions (table_id, total_amount, time_cost, product_cost, payment_method, reference_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [tableId, totalAmount, timeCost, productCost, paymentMethod, referenceNumber || null]
+        [tableId || null, totalAmount, timeCost, productCost, paymentMethod, referenceNumber || null]
       );
 
-      // End any active or stopped session
-      await client.query(
-        'UPDATE sessions SET end_time = NOW() WHERE table_id = $1 AND end_time IS NULL',
-        [tableId]
-      );
+      if (tableId) {
+        // End any active or stopped session (only for table-based transactions)
+        await client.query(
+          'UPDATE sessions SET end_time = NOW() WHERE table_id = $1 AND end_time IS NULL',
+          [tableId]
+        );
 
-      // Clear orders for this table
-      await client.query('DELETE FROM orders WHERE table_id = $1', [tableId]);
+        // Clear orders for this table
+        await client.query('DELETE FROM orders WHERE table_id = $1', [tableId]);
 
-      // Reset table status to available
-      await client.query(
-        'UPDATE tables SET status = $1 WHERE id = $2',
-        ['available', tableId]
-      );
+        // Reset table status to available
+        await client.query(
+          'UPDATE tables SET status = $1 WHERE id = $2',
+          ['available', tableId]
+        );
+      } else {
+        // Clear standalone orders
+        await client.query('DELETE FROM orders WHERE table_id IS NULL', []);
+      }
 
       await client.query('COMMIT');
 
@@ -70,8 +75,8 @@ router.get('/', async (req, res) => {
         t.*,
         tb.name as table_name
       FROM transactions t
-      JOIN tables tb ON t.table_id = tb.id
-      ORDER BY t.date DESC
+      LEFT JOIN tables tb ON t.table_id = tb.id
+      ORDER BY t.created_at DESC
     `);
     res.json(result.rows);
   } catch (error) {
@@ -90,9 +95,9 @@ router.get('/range', async (req, res) => {
         t.*,
         tb.name as table_name
       FROM transactions t
-      JOIN tables tb ON t.table_id = tb.id
-      WHERE t.date >= $1 AND t.date <= $2
-      ORDER BY t.date DESC
+      LEFT JOIN tables tb ON t.table_id = tb.id
+      WHERE t.created_at >= $1 AND t.created_at <= $2
+      ORDER BY t.created_at DESC
     `, [startDate, endDate]);
     
     res.json(result.rows);
@@ -112,7 +117,7 @@ router.get('/:id', async (req, res) => {
         t.*,
         tb.name as table_name
       FROM transactions t
-      JOIN tables tb ON t.table_id = tb.id
+      LEFT JOIN tables tb ON t.table_id = tb.id
       WHERE t.id = $1
     `, [id]);
 

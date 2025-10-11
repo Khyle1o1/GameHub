@@ -94,8 +94,12 @@ class ApiClient {
     return this.request<any[]>(`/orders/table/${tableId}`);
   }
 
+  async getStandaloneOrders() {
+    return this.request<any[]>('/orders/standalone');
+  }
+
   async addOrderItem(order: {
-    tableId: number;
+    tableId?: number | null;
     productId: number;
     productName: string;
     price: number;
@@ -126,9 +130,15 @@ class ApiClient {
     });
   }
 
+  async clearStandaloneOrders() {
+    return this.request<any>('/orders/standalone/clear', {
+      method: 'DELETE',
+    });
+  }
+
   // Transactions API
   async createTransaction(transaction: {
-    tableId: number;
+    tableId?: number | null;
     timeCost: number;
     productCost: number;
     totalAmount: number;

@@ -19,7 +19,7 @@ interface PosStore extends PosState {
   // API calls
   fetchTables: () => Promise<void>;
   fetchProducts: () => Promise<void>;
-  addOrderItem: (tableId: number, item: Omit<OrderItem, 'id' | 'tableId'>) => Promise<void>;
+  addOrderItem: (tableId: number | null, item: Omit<OrderItem, 'id' | 'tableId'>) => Promise<void>;
   updateOrderQuantity: (orderId: number, quantity: number) => Promise<void>;
   removeOrderItem: (orderId: number) => Promise<void>;
   clearTableOrders: (tableId: number) => Promise<void>;
@@ -28,6 +28,11 @@ interface PosStore extends PosState {
   resetTable: (tableId: number) => Promise<void>;
   addTimeExtension: (tableId: number, duration: number) => Promise<void>;
   checkoutTable: (tableId: number, paymentMethod?: 'cash' | 'gcash', referenceNumber?: string) => Promise<void>;
+  
+  // Standalone order management
+  fetchStandaloneOrders: () => Promise<void>;
+  clearStandaloneOrders: () => Promise<void>;
+  checkoutStandaloneOrders: (paymentMethod?: 'cash' | 'gcash', referenceNumber?: string) => Promise<void>;
   saveSettings: (settings: { hourlyRate: number; halfHourRate: number; tableCount?: number }) => Promise<void>;
   
   // Product management
@@ -38,7 +43,9 @@ interface PosStore extends PosState {
   // Helper methods
   getSelectedTable: () => Table | null;
   getTableOrders: (tableId: number) => OrderItem[];
+  getStandaloneOrders: () => OrderItem[];
   calculateTableTotal: (tableId: number) => { timeCost: number; productCost: number; total: number };
+  calculateStandaloneTotal: () => { productCost: number; total: number };
   calculateOpenTimeCost: (elapsedSeconds: number) => { totalCost: number; breakdown: string };
 }
 
@@ -109,6 +116,7 @@ export const usePosStore = create<PosStore>((set, get) => {
     selectedTableId: null,
     hourlyRate: initialSettings.hourlyRate,
     halfHourRate: initialSettings.halfHourRate,
+    standaloneOrders: [],
     isLoading: false,
     error: null,
 
@@ -181,7 +189,7 @@ export const usePosStore = create<PosStore>((set, get) => {
     try {
       set({ isLoading: true, error: null });
       
-      await apiClient.addOrderItem({
+      const result = await apiClient.addOrderItem({
         tableId,
         productId: item.productId,
         productName: item.productName,
@@ -189,8 +197,38 @@ export const usePosStore = create<PosStore>((set, get) => {
         quantity: item.quantity,
       });
       
-      // Refresh tables to get updated orders
-      await get().fetchTables();
+      if (tableId) {
+        // Refresh tables to get updated orders
+        await get().fetchTables();
+      } else {
+        // For standalone orders, immediately update the local state
+        const { standaloneOrders } = get();
+        const existingOrderIndex = standaloneOrders.findIndex(
+          order => order.productId === item.productId && order.tableId === null
+        );
+        
+        if (existingOrderIndex >= 0) {
+          // Update existing order quantity
+          const updatedOrders = [...standaloneOrders];
+          updatedOrders[existingOrderIndex] = {
+            ...updatedOrders[existingOrderIndex],
+            quantity: updatedOrders[existingOrderIndex].quantity + item.quantity
+          };
+          set({ standaloneOrders: updatedOrders });
+        } else {
+          // Add new order
+          const newOrder = {
+            id: result.id,
+            productId: item.productId,
+            productName: item.productName,
+            price: item.price,
+            quantity: item.quantity,
+            tableId: null,
+            createdAt: new Date().toISOString()
+          };
+          set({ standaloneOrders: [...standaloneOrders, newOrder] });
+        }
+      }
       set({ isLoading: false });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to add order item', isLoading: false });
@@ -201,6 +239,16 @@ export const usePosStore = create<PosStore>((set, get) => {
     try {
       set({ isLoading: true, error: null });
       await apiClient.updateOrderQuantity(orderId, quantity);
+      
+      // Update local state for standalone orders
+      const { standaloneOrders } = get();
+      const orderIndex = standaloneOrders.findIndex(order => order.id === orderId);
+      
+      if (orderIndex >= 0) {
+        const updatedOrders = [...standaloneOrders];
+        updatedOrders[orderIndex] = { ...updatedOrders[orderIndex], quantity };
+        set({ standaloneOrders: updatedOrders });
+      }
       
       // Refresh tables to get updated orders
       await get().fetchTables();
@@ -214,6 +262,11 @@ export const usePosStore = create<PosStore>((set, get) => {
     try {
       set({ isLoading: true, error: null });
       await apiClient.deleteOrderItem(orderId);
+      
+      // Update local state for standalone orders
+      const { standaloneOrders } = get();
+      const updatedOrders = standaloneOrders.filter(order => order.id !== orderId);
+      set({ standaloneOrders: updatedOrders });
       
       // Refresh tables to get updated orders
       await get().fetchTables();
@@ -312,6 +365,50 @@ export const usePosStore = create<PosStore>((set, get) => {
     }
   },
 
+  // Standalone order management
+  fetchStandaloneOrders: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      const orders = await apiClient.getStandaloneOrders();
+      set({ standaloneOrders: orders, isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch standalone orders', isLoading: false });
+    }
+  },
+
+  clearStandaloneOrders: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.clearStandaloneOrders();
+      set({ standaloneOrders: [], isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to clear standalone orders', isLoading: false });
+    }
+  },
+
+  checkoutStandaloneOrders: async (paymentMethod = 'cash', referenceNumber) => {
+    try {
+      set({ isLoading: true, error: null });
+      const { productCost, total } = get().calculateStandaloneTotal();
+      
+      await apiClient.createTransaction({
+        tableId: null,
+        timeCost: 0,
+        productCost,
+        totalAmount: total,
+        paymentMethod,
+        referenceNumber
+      });
+      
+      // Clear standalone orders after checkout
+      set({ standaloneOrders: [] });
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to checkout standalone orders', isLoading: false });
+      throw error; // Re-throw to handle in component
+    }
+  },
+
   getSelectedTable: () => {
     const { tables, selectedTableId } = get();
     return tables.find(table => table.id === selectedTableId) || null;
@@ -321,6 +418,11 @@ export const usePosStore = create<PosStore>((set, get) => {
     const { tables } = get();
     const table = tables.find(table => table.id === tableId);
     return table?.orders || [];
+  },
+
+  getStandaloneOrders: () => {
+    const { standaloneOrders } = get();
+    return standaloneOrders;
   },
 
   calculateTableTotal: (tableId) => {
@@ -364,6 +466,20 @@ export const usePosStore = create<PosStore>((set, get) => {
       timeCost,
       productCost,
       total: timeCost + productCost,
+    };
+  },
+
+  calculateStandaloneTotal: () => {
+    const { standaloneOrders } = get();
+    
+    // Calculate product cost for standalone orders
+    const productCost = standaloneOrders.reduce((sum, order) => {
+      return sum + (Number(order.price) * order.quantity);
+    }, 0);
+
+    return {
+      productCost,
+      total: productCost, // No time cost for standalone orders
     };
   },
 

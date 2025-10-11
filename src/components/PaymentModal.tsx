@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table } from '@/types/pos';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export function PaymentModal({ isOpen, onClose, table, totalAmount, onConfirmPay
       // Show success toast
       toast({
         title: "Payment Successful! 🎉",
-        description: `₱${totalAmount.toFixed(2)} payment completed for ${table?.name} via ${paymentMethod.toUpperCase()}`,
+        description: `₱${formatCurrency(totalAmount)} payment completed for ${table?.name || 'standalone order'} via ${paymentMethod.toUpperCase()}`,
         duration: 4000,
       });
       
@@ -74,7 +75,7 @@ export function PaymentModal({ isOpen, onClose, table, totalAmount, onConfirmPay
           {/* Total Amount */}
           <div className="p-4 rounded-lg border text-center" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
             <div className="text-sm" style={{ color: '#404750' }}>Total Amount</div>
-            <div className="text-3xl font-bold" style={{ color: '#2C313A' }}>₱{totalAmount.toFixed(2)}</div>
+            <div className="text-3xl font-bold" style={{ color: '#2C313A' }}>₱{formatCurrency(totalAmount)}</div>
           </div>
 
           {/* Payment Method Selection */}
