@@ -27,6 +27,9 @@ router.post('/', async (req, res) => {
           [tableId]
         );
 
+        // Get orders before clearing them to ensure sales data is recorded
+        const ordersResult = await client.query('SELECT * FROM orders WHERE table_id = $1', [tableId]);
+        
         // Clear orders for this table
         await client.query('DELETE FROM orders WHERE table_id = $1', [tableId]);
 
@@ -36,6 +39,9 @@ router.post('/', async (req, res) => {
           ['available', tableId]
         );
       } else {
+        // Get standalone orders before clearing them
+        const ordersResult = await client.query('SELECT * FROM orders WHERE table_id IS NULL', []);
+        
         // Clear standalone orders
         await client.query('DELETE FROM orders WHERE table_id IS NULL', []);
       }
