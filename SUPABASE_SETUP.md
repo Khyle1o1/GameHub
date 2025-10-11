@@ -57,18 +57,28 @@ Once your project is created, you'll need to collect these details:
 
 ### 4. Set Up the Database Schema
 
-Run the migration script to create all necessary tables:
+Run the setup script to create all necessary tables and enable security:
 
 ```bash
-npm run migrate
+npm run setup
 ```
 
-This will create:
+This will:
+- Create all database tables
+- Enable Row Level Security (RLS) on all tables
+- Set up appropriate security policies
+
+Tables created:
 - `tables` - Billiard table information
 - `products` - Available drinks and food
 - `time_sessions` - Table usage sessions
 - `orders` - Product orders per table
 - `transactions` - Completed checkouts
+- `sales` - Detailed product sales tracking
+- `sessions` - Table usage sessions
+- `inventory` - Inventory tracking
+- `time_extensions` - Time extension records
+- `settings` - Application settings
 
 ### 5. Verify Setup
 
@@ -97,27 +107,33 @@ The application includes optional real-time subscriptions. To enable them:
 
 ## 🛡️ Security Considerations
 
+### Row Level Security (RLS)
+✅ **RLS is automatically enabled** when you run `npm run setup`
+
+All tables have RLS enabled with policies that allow authenticated users to perform all operations. This provides a secure foundation for your application.
+
 ### For Development
 - The current setup uses the anon key, which is fine for development
 - All database operations go through your Express.js backend
+- RLS policies are in place for security
 
 ### For Production
-1. **Enable Row Level Security (RLS)**:
-   ```sql
-   ALTER TABLE tables ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE time_sessions ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-   ```
-
-2. **Create Policies** (example for tables):
-   ```sql
-   CREATE POLICY "Allow all operations for authenticated users" ON tables
-   FOR ALL USING (true);
-   ```
-
+1. **RLS is already enabled** - no additional setup needed
+2. **Review Policies**: Consider customizing RLS policies based on your specific security requirements
 3. **Use Service Role Key**: For production, consider using the service role key instead of anon key for backend operations
+4. **Monitor Access**: Use Supabase dashboard to monitor database access and queries
+
+### Manual RLS Management
+If you need to manage RLS manually:
+
+```bash
+# Enable RLS on all tables
+npm run enable-rls
+
+# Or run individual commands
+npm run migrate    # Create tables only
+npm run enable-rls # Enable RLS only
+```
 
 ## 📊 Monitoring Your Database
 

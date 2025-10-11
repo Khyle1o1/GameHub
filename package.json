@@ -13,7 +13,9 @@
     "server": "node server.js",
     "server:dev": "nodemon server.js",
     "migrate": "node scripts/migrate.js",
-    "setup": "npm install && npm run migrate",
+    "enable-rls": "node scripts/enable-rls.js",
+    "check-rls": "node scripts/check-rls.js",
+    "setup": "npm install && npm run migrate && npm run enable-rls",
     "start": "npm run server",
     "dev:full": "concurrently \"npm run server:dev\" \"npm run dev\""
   },
