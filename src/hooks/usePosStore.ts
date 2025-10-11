@@ -512,7 +512,7 @@ export const usePosStore = create<PosStore>((set, get) => {
     // Open Time Rate Logic:
     // 0-30 mins: ₱100 (halfHourRate)
     // 31-60 mins: ₱150 (hourlyRate)
-    // Beyond first hour: Every completed 30-min block alternates between adding ₱100 and ₱50
+    // Beyond first hour: Each hour costs ₱150 (hourlyRate), each 30-min block costs ₱100 (halfHourRate)
     
     let totalCost = 0;
     let breakdown = '';
@@ -530,34 +530,32 @@ export const usePosStore = create<PosStore>((set, get) => {
       totalCost = hourlyRate; // First hour costs ₱150
       const minutesBeyondFirstHour = totalMinutes - 60;
       
-      // Count completed 30-minute blocks beyond the first hour
-      const completed30MinBlocks = Math.floor(minutesBeyondFirstHour / 30);
+      // Count full hours beyond the first hour
+      const fullHoursBeyond = Math.floor(minutesBeyondFirstHour / 60);
+      const remainingMinutes = minutesBeyondFirstHour % 60;
       
-      // Each block alternates: ₱100, ₱50, ₱100, ₱50, etc.
-      for (let i = 0; i < completed30MinBlocks; i++) {
-        if (i % 2 === 0) {
-          totalCost += halfHourRate; // ₱100
-        } else {
-          totalCost += (hourlyRate - halfHourRate); // ₱50
-        }
+      // Each full hour costs ₱150 (hourlyRate)
+      totalCost += fullHoursBeyond * hourlyRate;
+      
+      // Any remaining 30-min block costs ₱100 (halfHourRate)
+      if (remainingMinutes >= 30) {
+        totalCost += halfHourRate;
       }
       
       // Build breakdown string
-      const fullHours = Math.floor(totalMinutes / 60);
-      const extraBlocks = completed30MinBlocks;
+      const totalHours = Math.floor(totalMinutes / 60);
+      const extraHalfHour = remainingMinutes >= 30 ? 1 : 0;
       
-      if (extraBlocks === 0) {
-        breakdown = `${fullHours} hr ₱${hourlyRate}`;
-      } else if (extraBlocks === 1) {
-        breakdown = `${fullHours} hr ₱${hourlyRate} + 30min ₱${halfHourRate}`;
+      if (fullHoursBeyond === 0 && extraHalfHour === 0) {
+        breakdown = `${totalHours} hr ₱${hourlyRate}`;
+      } else if (fullHoursBeyond === 0 && extraHalfHour === 1) {
+        breakdown = `${totalHours} hr ₱${hourlyRate} + 30min ₱${halfHourRate}`;
+      } else if (fullHoursBeyond === 1 && extraHalfHour === 0) {
+        breakdown = `${totalHours} hr ₱${hourlyRate * totalHours}`;
+      } else if (fullHoursBeyond === 1 && extraHalfHour === 1) {
+        breakdown = `${totalHours} hr ₱${hourlyRate * totalHours} + 30min ₱${halfHourRate}`;
       } else {
-        const additionalHours = Math.floor(extraBlocks / 2);
-        const extraHalfHour = extraBlocks % 2;
-        
-        breakdown = `${fullHours} hr ₱${hourlyRate}`;
-        if (additionalHours > 0) {
-          breakdown += ` + ${additionalHours} hr ₱${hourlyRate}`;
-        }
+        breakdown = `${totalHours} hr ₱${hourlyRate * totalHours}`;
         if (extraHalfHour > 0) {
           breakdown += ` + 30min ₱${halfHourRate}`;
         }
@@ -574,7 +572,7 @@ export const usePosStore = create<PosStore>((set, get) => {
     const { hourlyRate, halfHourRate } = get();
     const totalMinutes = Math.floor(totalDurationSeconds / 60);
     
-    // Countdown pricing logic:
+    // Countdown pricing logic (same as Open Time):
     // 30 mins: ₱100
     // 1 hour: ₱150
     // 1.5 hours: ₱250
@@ -590,11 +588,21 @@ export const usePosStore = create<PosStore>((set, get) => {
     } else if (totalMinutes <= 60) {
       totalCost = hourlyRate; // ₱150
     } else {
-      // Beyond 1 hour: ₱150 + (additional time * ₱100 per 30 mins)
-      totalCost = hourlyRate;
-      const additionalMinutes = totalMinutes - 60;
-      const additional30MinBlocks = Math.ceil(additionalMinutes / 30);
-      totalCost += additional30MinBlocks * halfHourRate; // ₱100 per 30-min block
+      // Beyond 1 hour: Each full hour costs ₱150, each 30-min block costs ₱100
+      totalCost = hourlyRate; // First hour costs ₱150
+      const minutesBeyondFirstHour = totalMinutes - 60;
+      
+      // Count full hours beyond the first hour
+      const fullHoursBeyond = Math.floor(minutesBeyondFirstHour / 60);
+      const remainingMinutes = minutesBeyondFirstHour % 60;
+      
+      // Each full hour costs ₱150 (hourlyRate)
+      totalCost += fullHoursBeyond * hourlyRate;
+      
+      // Any remaining 30-min block costs ₱100 (halfHourRate)
+      if (remainingMinutes >= 30) {
+        totalCost += halfHourRate;
+      }
     }
     
     return Math.round(totalCost * 100) / 100; // Round to 2 decimal places

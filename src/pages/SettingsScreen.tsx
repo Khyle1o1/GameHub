@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Clock, DollarSign, Table, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Clock, DollarSign, Table, CheckCircle, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
