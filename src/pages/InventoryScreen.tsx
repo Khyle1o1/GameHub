@@ -7,12 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { usePosStore } from '@/hooks/usePosStore';
 import { Product } from '@/types/pos';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import ComboManagement from '@/components/ComboManagement';
 
 export default function InventoryScreen() {
   const navigate = useNavigate();
@@ -185,26 +187,6 @@ export default function InventoryScreen() {
     }
   };
 
-  const handleAdjustQuantity = async (productId: number, adjustment: number) => {
-    try {
-      await apiClient.adjustInventory(productId, adjustment, 'adjustment');
-      toast({
-        title: "Inventory Updated",
-        description: `Quantity adjusted by ${adjustment > 0 ? '+' : ''}${adjustment}.`,
-        duration: 3000,
-      });
-      await fetchInventorySummary();
-    } catch (error) {
-      console.error('Error adjusting inventory:', error);
-      toast({
-        title: "Error",
-        description: "Failed to adjust inventory. Please try again.",
-        variant: "destructive",
-        duration: 4000,
-      });
-    }
-  };
-
   const getStockStatus = (quantity: number) => {
     if (quantity <= 0) return { status: 'out_of_stock', color: 'destructive', icon: AlertTriangle };
     if (quantity <= 10) return { status: 'low_stock', color: 'secondary', icon: TrendingDown };
@@ -308,8 +290,16 @@ export default function InventoryScreen() {
           </Card>
         </div>
 
-        {/* Filters and Actions */}
-        <Card className="mb-6" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+        {/* Tabs for Products and Combos */}
+        <Tabs defaultValue="products" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
+            <TabsTrigger value="products" style={{ color: '#2C313A' }}>Products</TabsTrigger>
+            <TabsTrigger value="combos" style={{ color: '#2C313A' }}>Combo Items</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products" className="space-y-6">
+            {/* Filters and Actions */}
+            <Card className="mb-6" style={{ backgroundColor: '#E8E0D2', borderColor: '#9B9182' }}>
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="flex flex-col md:flex-row gap-4 flex-1">
@@ -511,29 +501,7 @@ export default function InventoryScreen() {
                           ₱{formatCurrency(product.cost)}
                         </td>
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span style={{ color: '#404750' }}>{Number(product.quantity)}</span>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAdjustQuantity(product.id, -1)}
-                                className="h-6 w-6 p-0"
-                                style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                              >
-                                -
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAdjustQuantity(product.id, 1)}
-                                className="h-6 w-6 p-0"
-                                style={{ borderColor: '#9B9182', color: '#2C313A' }}
-                              >
-                                +
-                              </Button>
-                            </div>
-                          </div>
+                          <span style={{ color: '#404750' }}>{Number(product.quantity)}</span>
                         </td>
                         <td className="p-4" style={{ color: '#404750' }}>
                           ₱{formatCurrency(productValue)}
@@ -571,6 +539,12 @@ export default function InventoryScreen() {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="combos" className="space-y-6">
+            <ComboManagement />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

@@ -12,11 +12,13 @@ export default function PosScreen() {
   const { 
     tables, 
     products, 
+    comboItems,
     selectedTableId, 
     isLoading, 
     error,
     fetchTables, 
     fetchProducts, 
+    fetchComboItems,
     getSelectedTable,
     fetchStandaloneOrders
   } = usePosStore();
@@ -27,6 +29,7 @@ export default function PosScreen() {
   useEffect(() => {
     fetchTables();
     fetchProducts();
+    fetchComboItems();
     fetchStandaloneOrders();
     
     // Update current time every second
@@ -35,7 +38,7 @@ export default function PosScreen() {
     }, 1000);
 
     return () => clearInterval(timeInterval);
-  }, [fetchTables, fetchProducts, fetchStandaloneOrders]);
+  }, [fetchTables, fetchProducts, fetchComboItems, fetchStandaloneOrders]);
 
   if (isLoading && tables.length === 0) {
     return (
@@ -176,6 +179,7 @@ export default function PosScreen() {
               <h2 className="text-2xl font-bold mb-4" style={{ color: '#2C313A' }}>Products</h2>
               <ProductList
                 products={products}
+                comboItems={comboItems}
                 disabled={false}
               />
             </div>

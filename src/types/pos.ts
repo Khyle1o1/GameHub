@@ -28,7 +28,28 @@ export interface Product {
   cost: number | string; // Purchase or base cost
   quantity: number; // Current stock count
   category: 'drink' | 'food' | 'accessory' | 'other';
+  is_combo?: boolean; // Whether this is a combo item
   created_at?: string;
+}
+
+export interface ComboItem {
+  id: number;
+  name: string;
+  description?: string;
+  price: number | string;
+  category: 'drink' | 'food' | 'accessory' | 'other' | 'combo';
+  is_active: boolean;
+  components: ComboComponent[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ComboComponent {
+  id: number;
+  combo_id: number;
+  product_id: number;
+  quantity: number;
+  product?: Product; // Populated when fetching combo details
 }
 
 export interface Inventory {
@@ -51,6 +72,7 @@ export interface OrderItem {
   price: number | string; // Can be number or string from database
   quantity: number;
   tableId: number | null; // Can be null for standalone orders
+  comboId?: number | null; // Reference to combo item if this is a combo order
   createdAt?: string;
 }
 

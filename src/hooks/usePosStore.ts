@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Table, Product, OrderItem, PosState } from '@/types/pos';
+import { Table, Product, OrderItem, PosState, ComboItem } from '@/types/pos';
 import { apiClient } from '@/lib/api';
 import { websocketService } from '@/lib/websocket';
 
@@ -7,8 +7,10 @@ interface PosStore extends PosState {
   isLoading: boolean;
   error: string | null;
   halfHourRate: number;
+  comboItems: ComboItem[];
   setTables: (tables: Table[]) => void;
   setProducts: (products: Product[]) => void;
+  setComboItems: (comboItems: ComboItem[]) => void;
   setSelectedTable: (tableId: number | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -19,6 +21,7 @@ interface PosStore extends PosState {
   // API calls
   fetchTables: () => Promise<void>;
   fetchProducts: () => Promise<void>;
+  fetchComboItems: () => Promise<void>;
   addOrderItem: (tableId: number | null, item: Omit<OrderItem, 'id' | 'tableId'>) => Promise<void>;
   updateOrderQuantity: (orderId: number, quantity: number) => Promise<void>;
   removeOrderItem: (orderId: number) => Promise<void>;
@@ -39,6 +42,12 @@ interface PosStore extends PosState {
   createProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   updateProduct: (id: number, product: Partial<Product>) => Promise<void>;
   deleteProduct: (id: number) => Promise<void>;
+  
+  // Combo management
+  createComboItem: (combo: Omit<ComboItem, 'id'>) => Promise<void>;
+  updateComboItem: (id: number, combo: Partial<ComboItem>) => Promise<void>;
+  deleteComboItem: (id: number) => Promise<void>;
+  checkComboStock: (id: number, quantity?: number) => Promise<any>;
   
   // Helper methods
   getSelectedTable: () => Table | null;
@@ -113,6 +122,7 @@ export const usePosStore = create<PosStore>((set, get) => {
   return {
     tables: [],
     products: initialProducts,
+    comboItems: [],
     selectedTableId: null,
     hourlyRate: initialSettings.hourlyRate,
     halfHourRate: initialSettings.halfHourRate,
@@ -122,6 +132,7 @@ export const usePosStore = create<PosStore>((set, get) => {
 
   setTables: (tables) => set({ tables }),
   setProducts: (products) => set({ products }),
+  setComboItems: (comboItems) => set({ comboItems }),
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
@@ -185,6 +196,16 @@ export const usePosStore = create<PosStore>((set, get) => {
     }
   },
 
+  fetchComboItems: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      const comboItems = await apiClient.getComboItems();
+      set({ comboItems, isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch combo items', isLoading: false });
+    }
+  },
+
   addOrderItem: async (tableId, item) => {
     try {
       set({ isLoading: true, error: null });
@@ -195,6 +216,7 @@ export const usePosStore = create<PosStore>((set, get) => {
         productName: item.productName,
         price: item.price,
         quantity: item.quantity,
+        comboId: item.comboId,
       });
       
       if (tableId) {
@@ -689,6 +711,52 @@ export const usePosStore = create<PosStore>((set, get) => {
       
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to delete product', isLoading: false });
+    }
+  },
+
+  // Combo management methods
+  createComboItem: async (combo) => {
+    try {
+      set({ isLoading: true, error: null });
+      const newCombo = await apiClient.createComboItem(combo);
+      const { comboItems } = get();
+      set({ comboItems: [...comboItems, newCombo], isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to create combo item', isLoading: false });
+    }
+  },
+
+  updateComboItem: async (id, combo) => {
+    try {
+      set({ isLoading: true, error: null });
+      const updatedCombo = await apiClient.updateComboItem(id, combo);
+      const { comboItems } = get();
+      set({ 
+        comboItems: comboItems.map(c => c.id === id ? updatedCombo : c), 
+        isLoading: false 
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update combo item', isLoading: false });
+    }
+  },
+
+  deleteComboItem: async (id) => {
+    try {
+      set({ isLoading: true, error: null });
+      await apiClient.deleteComboItem(id);
+      const { comboItems } = get();
+      set({ comboItems: comboItems.filter(c => c.id !== id), isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to delete combo item', isLoading: false });
+    }
+  },
+
+  checkComboStock: async (id, quantity = 1) => {
+    try {
+      return await apiClient.checkComboStock(id, quantity);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to check combo stock', isLoading: false });
+      throw error;
     }
   },
   };

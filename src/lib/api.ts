@@ -104,6 +104,7 @@ class ApiClient {
     productName: string;
     price: number;
     quantity: number;
+    comboId?: number | null;
   }) {
     return this.request<any>('/orders', {
       method: 'POST',
@@ -240,6 +241,54 @@ class ApiClient {
     return this.request<any>(`/inventory/adjust/${productId}`, {
       method: 'POST',
       body: JSON.stringify({ quantity, changeType }),
+    });
+  }
+
+  // Combo Items API
+  async getComboItems() {
+    return this.request<any[]>('/combo-items');
+  }
+
+  async getComboItem(id: number) {
+    return this.request<any>(`/combo-items/${id}`);
+  }
+
+  async createComboItem(combo: {
+    name: string;
+    description?: string;
+    price: number;
+    category: string;
+    components: Array<{ product_id: number; quantity: number }>;
+  }) {
+    return this.request<any>('/combo-items', {
+      method: 'POST',
+      body: JSON.stringify(combo),
+    });
+  }
+
+  async updateComboItem(id: number, combo: {
+    name: string;
+    description?: string;
+    price: number;
+    category: string;
+    components: Array<{ product_id: number; quantity: number }>;
+  }) {
+    return this.request<any>(`/combo-items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(combo),
+    });
+  }
+
+  async deleteComboItem(id: number) {
+    return this.request<any>(`/combo-items/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async checkComboStock(id: number, quantity: number = 1) {
+    return this.request<any>(`/combo-items/${id}/check-stock`, {
+      method: 'POST',
+      body: JSON.stringify({ quantity }),
     });
   }
 }
